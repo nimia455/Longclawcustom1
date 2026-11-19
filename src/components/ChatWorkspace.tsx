@@ -25,12 +25,12 @@ import {
   Layers,
   Menu,
   Lightbulb,
-  ExternalLink,
   ShieldCheck,
   AlertTriangle,
   RefreshCw,
   PanelLeftClose,
   PanelLeftOpen,
+  Play,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -40,6 +40,13 @@ import {
   syncUserProfile,
 } from '../lib/firebase';
 import { LongclawLogo, ModelLogo } from './Icons';
+import { CodePreviewPanel } from './CodePreviewPanel';
+import {
+  extractCodeBlocks,
+  getSiblingWebAssets,
+  isPreviewableCode,
+  normalizeCodeLanguage,
+} from '../lib/codeRunner';
 import { renderMarkdown } from '../lib/markdown';
 import { useKeyboardShortcuts, formatModKey } from '../hooks/useKeyboardShortcuts';
 import {
@@ -50,6 +57,7 @@ import {
   getChatModelOption,
   isValidChatModel,
 } from '../lib/models';
+import { Language, TRANSLATIONS } from '../lib/i18n';
 
 interface ChatWorkspaceProps {
   user: User | null;
@@ -65,6 +73,8 @@ interface ChatWorkspaceProps {
   onDeleteAccount: () => Promise<void>;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  lang: Language;
+  onChangeLang: (lang: Language) => void;
   onBackToLanding: () => void;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
@@ -74,13 +84,6 @@ interface ChatWorkspaceProps {
   composerFocusTick: number;
   modalsOpen?: boolean;
 }
-
-const SUGGESTIONS: string[] = [
-  'Kuantum bilgisayarları basitçe anlat',
-  'Zaman yönetimimi nasıl iyileştirebilirim?',
-  'Müşteriye teşekkür eden samimi ve kısa bir e-posta yaz',
-  'Bu metni üç ana maddede özetle:',
-];
 
 export function ChatWorkspace({
   user,
@@ -96,6 +99,8 @@ export function ChatWorkspace({
   onDeleteAccount,
   theme,
   onToggleTheme,
+  lang,
+  onChangeLang,
   onBackToLanding,
   sidebarOpen,
   onOpenSidebar,
@@ -105,15 +110,27 @@ export function ChatWorkspace({
   composerFocusTick,
   modalsOpen = false,
 }: ChatWorkspaceProps) {
+  const t = TRANSLATIONS[lang];
+  const cText = t.chat;
   const currentChat = chats.find((c) => c.id === currentChatId) || chats[0] || null;
   const modKey = formatModKey();
 
+  const isDefaultChatTitle = (title?: string | null) =>
+    !title || title === 'Yeni sohbet' || title === 'New chat';
+  const formatChatTitle = (title?: string | null) =>
+    isDefaultChatTitle(title) ? t.common.newChat : title!;
+
   // Local chat settings
   const [depth, setDepth] = useState<'fast' | 'mid' | 'deep'>(currentChat?.depth || 'mid');
-  const [webSearch, setWebSearch] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ChatModelId>(() => {
     try {
       const saved = localStorage.getItem('lc_selected_model');
+      if (saved === 'longclaw-clawing-1-low') {
+        return 'longclaw-clawing-1.1-low';
+      }
+      if (saved === 'longclaw-clawing-1') {
+        return 'longclaw-clawing-1.1';
+      }
       return isValidChatModel(saved) ? saved : DEFAULT_CHAT_MODEL;
     } catch {
       return DEFAULT_CHAT_MODEL;
@@ -125,7 +142,9 @@ export function ChatWorkspace({
   const [searchQuery, setSearchQuery] = useState('');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  const [otherModelsOpen, setOtherModelsOpen] = useState(() => selectedModel === 'longclaw-clawing-1');
+  const [otherModelsOpen, setOtherModelsOpen] = useState(() =>
+    OTHER_MODELS.some((m) => m.id === selectedModel)
+  );
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editTitleInput, setEditTitleInput] = useState('');
   const [deleteArm, setDeleteArm] = useState(false);
@@ -135,16 +154,19 @@ export function ChatWorkspace({
   const [emailVerifyStatus, setEmailVerifyStatus] = useState<string | null>(null);
   const [checkingVerify, setCheckingVerify] = useState(false);
   const [userVersion, setUserVersion] = useState(0);
+  const [codePreview, setCodePreview] = useState<{
+    code: string;
+    language: string;
+    siblingCss?: string;
+    siblingJs?: string;
+  } | null>(null);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
 
   // Input & streaming
   const [inputMessage, setInputMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingThoughts, setStreamingThoughts] = useState('');
   const [streamingText, setStreamingText] = useState('');
-  const [streamingMeta, setStreamingMeta] = useState<{ searches: string[]; sources: any[] }>({
-    searches: [],
-    sources: [],
-  });
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -172,12 +194,33 @@ export function ChatWorkspace({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [modelMenuOpen]);
 
-  // Sync depth when chat changes
+  // Sync depth and reset active code preview when chat changes
   useEffect(() => {
     if (currentChat) {
       setDepth(currentChat.depth || 'mid');
     }
+    setCodePreview(null);
+    setPreviewExpanded(false);
   }, [currentChat?.id]);
+
+  const openCodePreview = (
+    messageContent: string,
+    code: string,
+    rawLanguage: string,
+    blockIndex: number
+  ) => {
+    const normalized = normalizeCodeLanguage(rawLanguage, code) || rawLanguage;
+    const assets =
+      normalized === 'html'
+        ? getSiblingWebAssets(messageContent, blockIndex)
+        : { siblingCss: undefined, siblingJs: undefined };
+    setCodePreview({
+      code,
+      language: normalized,
+      siblingCss: assets.siblingCss || undefined,
+      siblingJs: assets.siblingJs || undefined,
+    });
+  };
 
   // Focus composer when a new chat is triggered via shortcut or button
   useEffect(() => {
@@ -218,7 +261,9 @@ export function ChatWorkspace({
     {
       key: 'Escape',
       allowInInput: true,
-      enabled: !modalsOpen && Boolean(editingTitleId || modelMenuOpen || profileMenuOpen || mobileMenuOpen),
+      enabled:
+        !modalsOpen &&
+        Boolean(editingTitleId || modelMenuOpen || profileMenuOpen || mobileMenuOpen || codePreview),
       handler: () => {
         if (editingTitleId) {
           setEditingTitleId(null);
@@ -228,6 +273,9 @@ export function ChatWorkspace({
           setProfileMenuOpen(false);
         } else if (mobileMenuOpen) {
           onSetMobileMenuOpen(false);
+        } else if (codePreview) {
+          setCodePreview(null);
+          setPreviewExpanded(false);
         }
       },
     },
@@ -260,11 +308,10 @@ export function ChatWorkspace({
         {
           id: `msg-${Date.now()}`,
           role: 'assistant' as const,
-          content: streamingText || 'Yanıt durduruldu.',
+          content: streamingText || cText.stoppedFallback,
           thoughts: streamingThoughts,
-          searches: streamingMeta.searches,
-          sources: streamingMeta.sources,
           stopped: true,
+          modelId: selectedModel,
           createdAt: Date.now(),
         },
       ];
@@ -301,7 +348,6 @@ export function ChatWorkspace({
     setIsStreaming(true);
     setStreamingText('');
     setStreamingThoughts('');
-    setStreamingMeta({ searches: [], sources: [] });
 
     abortControllerRef.current = new AbortController();
     const startTime = Date.now();
@@ -315,8 +361,8 @@ export function ChatWorkspace({
           messages: updatedWithUser.map((m) => ({ role: m.role, content: m.content })),
           depth,
           mode: 'chat',
-          web: webSearch,
           model: selectedModel,
+          lang,
         }),
       });
 
@@ -326,14 +372,12 @@ export function ChatWorkspace({
       }
 
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('Response body okunamadı.');
+      if (!reader) throw new Error(cText.readBodyError);
 
       const decoder = new TextDecoder();
       let buffer = '';
       let accumulatedText = '';
       let accumulatedThoughts = '';
-      let accumulatedSearches: string[] = [];
-      let accumulatedSources: any[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -357,14 +401,7 @@ export function ChatWorkspace({
               accumulatedThoughts += event.x;
               setStreamingThoughts(accumulatedThoughts);
             } else if (event.t === 'err') {
-              throw new Error(event.x || 'Yanıt üretilirken bir hata oluştu.');
-            } else if (event.t === 'meta') {
-              if (event.searches) accumulatedSearches = event.searches;
-              if (event.sources) accumulatedSources = event.sources;
-              setStreamingMeta({
-                searches: accumulatedSearches,
-                sources: accumulatedSources,
-              });
+              throw new Error(event.x || cText.streamError);
             }
           } catch (parseErr: any) {
             if (parseErr instanceof SyntaxError) {
@@ -380,11 +417,10 @@ export function ChatWorkspace({
       const newAssistantMsg: ChatMessage = {
         id: `msg-${Date.now()}`,
         role: 'assistant',
-        content: accumulatedText || 'Yanıt alınamadı.',
+        content: accumulatedText || cText.noResponseFallback,
         thoughts: accumulatedThoughts,
-        searches: accumulatedSearches,
-        sources: accumulatedSources,
         dur: finalDuration,
+        modelId: selectedModel,
         createdAt: Date.now(),
       };
 
@@ -392,10 +428,7 @@ export function ChatWorkspace({
       void onUpdateChatMessages(currentChat.id, finalMessages);
 
       // Auto-title in the background so the chat completes immediately without waiting for a second API round-trip
-      if (
-        (currentChat.title === 'Yeni sohbet' || !currentChat.title) &&
-        updatedWithUser.length === 1
-      ) {
+      if (isDefaultChatTitle(currentChat.title) && updatedWithUser.length === 1) {
         const chatIdToTitle = currentChat.id;
         void (async () => {
           let newTitle = text.slice(0, 30);
@@ -406,6 +439,7 @@ export function ChatWorkspace({
               body: JSON.stringify({
                 userMessage: text,
                 assistantMessage: accumulatedText,
+                lang,
               }),
             });
             if (titleRes.ok) {
@@ -426,7 +460,7 @@ export function ChatWorkspace({
       const errorMsg: ChatMessage = {
         id: `msg-${Date.now()}`,
         role: 'assistant',
-        content: `Şu an yanıt veremedim: ${err.message || 'Bağlantı hatası'}. Lütfen tekrar deneyin.`,
+        content: cText.chatErrorMessage(err.message || cText.connectionError),
         createdAt: Date.now(),
       };
       await onUpdateChatMessages(currentChat.id, [...updatedWithUser, errorMsg]);
@@ -458,7 +492,7 @@ export function ChatWorkspace({
     const reader = new FileReader();
     reader.onload = () => {
       const fileContent = String(reader.result || '').slice(0, 30000);
-      const snippet = `[Dosya: ${file.name}]\n\`\`\`\n${fileContent}\n\`\`\`\n\n`;
+      const snippet = `[${cText.fileLabel}: ${file.name}]\n\`\`\`\n${fileContent}\n\`\`\`\n\n`;
       setInputMessage((prev) => snippet + prev);
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -470,8 +504,8 @@ export function ChatWorkspace({
 
   const handleExportChat = () => {
     if (!currentChat || !currentChat.messages?.length) return;
-    const markdown = `# ${currentChat.title}\n\n${currentChat.messages
-      .map((m) => `**${m.role === 'user' ? 'Sen' : 'Longclaw'}:**\n${m.content}`)
+    const markdown = `# ${formatChatTitle(currentChat.title)}\n\n${currentChat.messages
+      .map((m) => `**${m.role === 'user' ? cText.exportUserLabel : 'Longclaw'}:**\n${m.content}`)
       .join('\n\n---\n\n')}`;
 
     navigator.clipboard.writeText(markdown);
@@ -522,7 +556,7 @@ export function ChatWorkspace({
             <button
               onClick={onBackToLanding}
               className="flex items-center gap-2 font-space font-bold text-lg text-[var(--tx)] hover:opacity-80 transition-opacity cursor-pointer"
-              title="Tanıtım sayfasına dön"
+              title={cText.backToLandingTitle}
             >
               <LongclawLogo className="w-6 h-6" />
               <span>Longclaw</span>
@@ -531,7 +565,7 @@ export function ChatWorkspace({
             <button
               onClick={() => onSetMobileMenuOpen(false)}
               className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--card)] cursor-pointer"
-              aria-label="Menüyü kapat"
+              aria-label={cText.closeMenuAria}
             >
               <X className="w-5 h-5" />
             </button>
@@ -543,12 +577,12 @@ export function ChatWorkspace({
               onNewChat();
               onSetMobileMenuOpen(false);
             }}
-            title={`Yeni sohbet (${modKey}+K)`}
+            title={`${cText.newChatTitle} (${modKey}+K)`}
             className="w-full flex items-center justify-between py-3 md:py-2.5 px-3.5 rounded-xl bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all shadow-xs cursor-pointer whitespace-nowrap shrink-0"
           >
             <span className="flex items-center gap-2">
               <Plus className="w-4 h-4 shrink-0" />
-              <span>Yeni sohbet</span>
+              <span>{cText.newChatTitle}</span>
             </span>
             <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-[var(--on)]/15 text-[10px] font-sans font-medium tracking-wide opacity-80">
               {modKey}+K
@@ -561,8 +595,8 @@ export function ChatWorkspace({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder={`Sohbetlerde ara (/)`}
-              title={`Sohbetlerde ara (/ veya ${modKey}+Shift+F)`}
+              placeholder={cText.searchPlaceholder}
+              title={`${cText.searchTitle} (/ · ${modKey}+Shift+F)`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-8 py-2.5 md:py-2 text-base md:text-xs rounded-xl bg-[var(--card)] border border-[var(--bd)] text-[var(--tx)] placeholder:text-[var(--mut)] outline-none focus:border-[var(--tx)] transition-colors"
@@ -581,7 +615,7 @@ export function ChatWorkspace({
           <div className="flex-1 overflow-y-auto space-y-1 pr-0.5">
             {filteredChats.length === 0 ? (
               <div className="text-center py-8 text-xs text-[var(--mut)]">
-                {searchQuery ? 'Sonuç bulunamadı' : 'Henüz sohbet yok'}
+                {searchQuery ? cText.noResults : cText.noChatsYet}
               </div>
             ) : (
               filteredChats.map((c) => {
@@ -639,7 +673,7 @@ export function ChatWorkspace({
                     </div>
                   ) : (
                     <>
-                      <span className="flex-1 truncate">{c.title || 'Yeni sohbet'}</span>
+                      <span className="flex-1 truncate">{formatChatTitle(c.title)}</span>
 
                       <div
                         className={`flex items-center gap-0.5 transition-opacity ${
@@ -656,7 +690,7 @@ export function ChatWorkspace({
                           className={`p-1 rounded hover:bg-[var(--surf)] ${
                             c.pin ? 'opacity-100 text-[var(--tx)]' : 'text-[var(--mut)]'
                           }`}
-                          title={c.pin ? 'Sabitlemeyi kaldır' : 'Üste sabitle'}
+                          title={c.pin ? cText.unpinTitle : cText.pinTitle}
                         >
                           <Pin className="w-3 h-3" />
                         </button>
@@ -665,10 +699,10 @@ export function ChatWorkspace({
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingTitleId(c.id);
-                            setEditTitleInput(c.title || '');
+                            setEditTitleInput(formatChatTitle(c.title));
                           }}
                           className="p-1 rounded text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]"
-                          title="Yeniden adlandır"
+                          title={cText.renameTitle}
                         >
                           <Edit2 className="w-3 h-3" />
                         </button>
@@ -679,7 +713,7 @@ export function ChatWorkspace({
                             onDeleteChat(c.id);
                           }}
                           className="p-1 rounded text-[var(--mut)] hover:text-red-500 hover:bg-[var(--surf)]"
-                          title="Sil"
+                          title={cText.deleteTitle}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -706,7 +740,7 @@ export function ChatWorkspace({
               >
                 <div className="px-3 py-2 border-b border-[var(--bd)] space-y-1">
                   <p className="font-medium text-[var(--tx)] truncate">
-                    {user?.displayName || 'Kullanıcı'}
+                    {user?.displayName || t.common.defaultUser}
                   </p>
                   <p className="text-[11px] text-[var(--mut)] truncate">
                     {user?.email || ''}
@@ -721,7 +755,7 @@ export function ChatWorkspace({
                         }`}
                       >
                         <ShieldCheck className="w-2.5 h-2.5" />
-                        {user.emailVerified ? 'E-posta Doğrulandı' : 'E-posta Onaysız'}
+                        {user.emailVerified ? cText.emailVerified : cText.emailUnverified}
                       </span>
                     </div>
                   )}
@@ -735,7 +769,18 @@ export function ChatWorkspace({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-[var(--surf)] text-[var(--tx)] cursor-pointer"
               >
                 {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                <span>{theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}</span>
+                <span>{theme === 'dark' ? cText.switchToLight : cText.switchToDark}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  onChangeLang(lang === 'tr' ? 'en' : 'tr');
+                  setProfileMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-[var(--surf)] text-[var(--tx)] cursor-pointer"
+              >
+                <Globe className="w-4 h-4" />
+                <span>{cText.switchLanguageLabel}</span>
               </button>
 
               <button
@@ -746,7 +791,7 @@ export function ChatWorkspace({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-[var(--surf)] text-[var(--tx)] cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Çıkış yap</span>
+                <span>{cText.signOut}</span>
               </button>
 
               <button
@@ -762,7 +807,7 @@ export function ChatWorkspace({
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-red-500/10 text-red-500 font-medium cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>{deleteArm ? 'Emin misin? Tekrar tıkla' : 'Hesabı ve verileri sil'}</span>
+                <span>{deleteArm ? cText.deleteAccountConfirm : cText.deleteAccount}</span>
               </button>
               </motion.div>
             )}
@@ -777,7 +822,7 @@ export function ChatWorkspace({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-[var(--tx)] truncate">
-                {user?.displayName || 'Kullanıcı'}
+                {user?.displayName || t.common.defaultUser}
               </p>
               <p className="text-[10px] text-[var(--mut)] truncate">
                 {user?.email || 'Firebase Auth'}
@@ -797,8 +842,8 @@ export function ChatWorkspace({
             <button
               onClick={() => onSetMobileMenuOpen(true)}
               className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl border border-[var(--bd)] text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer shrink-0"
-              aria-label="Kenar çubuğunu aç"
-              title={`Kenar çubuğu (${modKey}+B)`}
+              aria-label={cText.openSidebarAria}
+              title={`${cText.sidebarLabel} (${modKey}+B)`}
             >
               <Menu className="w-4 h-4" />
             </button>
@@ -806,8 +851,8 @@ export function ChatWorkspace({
             <button
               onClick={onToggleSidebar}
               className="hidden md:inline-flex items-center justify-center p-2 rounded-xl border border-[var(--bd)] hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
-              aria-label={sidebarOpen ? 'Kenar çubuğunu gizle' : 'Kenar çubuğunu göster'}
-              title={`${sidebarOpen ? 'Kenar çubuğunu gizle' : 'Kenar çubuğunu göster'} (${modKey}+B)`}
+              aria-label={sidebarOpen ? cText.hideSidebar : cText.showSidebar}
+              title={`${sidebarOpen ? cText.hideSidebar : cText.showSidebar} (${modKey}+B)`}
             >
               {sidebarOpen ? (
                 <PanelLeftClose className="w-4 h-4" />
@@ -817,7 +862,7 @@ export function ChatWorkspace({
             </button>
 
             <h2 className="font-serif-fraunces text-[15px] sm:text-base font-semibold truncate max-w-[140px] sm:max-w-md">
-              {currentChat?.title || 'Yeni sohbet'}
+              {formatChatTitle(currentChat?.title)}
             </h2>
           </div>
 
@@ -831,10 +876,10 @@ export function ChatWorkspace({
                     ? 'bg-[var(--ac)] text-[var(--on)] shadow-xs'
                     : 'text-[var(--mut)] hover:text-[var(--tx)]'
                 }`}
-                title="Hızlı mod: Düşük düşünme eforu ile hızlı ve doğrudan yanıtlar"
+                title={cText.depthFastTitle}
               >
                 <Zap className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
-                <span className="hidden sm:inline">Hızlı</span>
+                <span className="hidden sm:inline">{cText.depthFast}</span>
               </button>
 
               <button
@@ -844,10 +889,10 @@ export function ChatWorkspace({
                     ? 'bg-[var(--ac)] text-[var(--on)] shadow-xs'
                     : 'text-[var(--mut)] hover:text-[var(--tx)]'
                 }`}
-                title="Orta mod: Dengeli düşünme eforu ve akıl yürütme"
+                title={cText.depthMidTitle}
               >
                 <ListFilter className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
-                <span className="hidden sm:inline">Orta</span>
+                <span className="hidden sm:inline">{cText.depthMid}</span>
               </button>
 
               <button
@@ -857,10 +902,10 @@ export function ChatWorkspace({
                     ? 'bg-[var(--ac)] text-[var(--on)] shadow-xs'
                     : 'text-[var(--mut)] hover:text-[var(--tx)]'
                 }`}
-                title="Derin mod: Yüksek düşünme eforu ve kapsamlı analiz"
+                title={cText.depthDeepTitle}
               >
                 <Layers className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
-                <span className="hidden sm:inline">Derin</span>
+                <span className="hidden sm:inline">{cText.depthDeep}</span>
               </button>
             </div>
 
@@ -869,7 +914,7 @@ export function ChatWorkspace({
               onClick={handleExportChat}
               disabled={!currentChat?.messages?.length}
               className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl border border-[var(--bd)] hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-all cursor-pointer disabled:opacity-30 shrink-0"
-              title="Sohbeti Markdown olarak kopyala"
+              title={cText.exportMarkdownTitle}
             >
               {copiedExport ? (
                 <Check className="w-4 h-4 text-emerald-500" />
@@ -886,8 +931,7 @@ export function ChatWorkspace({
             <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span>
-                {emailVerifyStatus ||
-                  `E-posta adresiniz (${user.email}) henüz doğrulanmadı.`}
+                {emailVerifyStatus || cText.emailUnverifiedBanner(user.email)}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -898,16 +942,16 @@ export function ChatWorkspace({
                   try {
                     setCheckingVerify(true);
                     await sendEmailVerification(user);
-                    setEmailVerifyStatus('Doğrulama bağlantısı tekrar gönderildi. Gelen kutunuzu kontrol edin.');
+                    setEmailVerifyStatus(cText.emailVerificationSent);
                   } catch (err: any) {
-                    setEmailVerifyStatus(err.message || 'E-posta gönderilemedi.');
+                    setEmailVerifyStatus(err.message || cText.emailSendFailed);
                   } finally {
                     setCheckingVerify(false);
                   }
                 }}
                 className="px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 font-medium cursor-pointer"
               >
-                Doğrulama Gönder
+                {cText.sendVerification}
               </button>
               <button
                 type="button"
@@ -919,7 +963,7 @@ export function ChatWorkspace({
                     await syncUserProfile(user);
                     setUserVersion((v) => v + 1);
                     if (!user.emailVerified) {
-                      setEmailVerifyStatus('Henüz doğrulanmamış görünüyor. Lütfen e-postanızdaki bağlantıya tıklayın.');
+                      setEmailVerifyStatus(cText.emailStillUnverified);
                     }
                   } finally {
                     setCheckingVerify(false);
@@ -928,7 +972,7 @@ export function ChatWorkspace({
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium cursor-pointer"
               >
                 <RefreshCw className={`w-3 h-3 ${checkingVerify ? 'animate-spin' : ''}`} />
-                <span>Kontrol Et</span>
+                <span>{cText.checkAgain}</span>
               </button>
             </div>
           </div>
@@ -945,16 +989,18 @@ export function ChatWorkspace({
 
                 <div className="px-2">
                   <h3 className="font-serif-fraunces text-2xl sm:text-3xl font-semibold">
-                    Merhaba, {user?.displayName ? user.displayName.split(' ')[0] : 'Arkadaşım'}
+                    {cText.helloUser(
+                      user?.displayName ? user.displayName.split(' ')[0] : cText.defaultFriendName
+                    )}
                   </h3>
                   <p className="text-sm text-[var(--mut)] mt-1.5 max-w-md mx-auto leading-relaxed">
-                    Bir soru sor ya da aşağıdaki hazır önerilerden birini dene.
+                    {cText.emptySubtitle}
                   </p>
                 </div>
 
                 {/* Suggestions Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 max-w-xl mx-auto text-left pt-1 sm:pt-2">
-                  {SUGGESTIONS.map((sug, i) => (
+                  {cText.suggestions.map((sug, i) => (
                     <button
                       key={i}
                       onClick={() => {
@@ -1005,7 +1051,10 @@ export function ChatWorkspace({
                           >
                             <span className="flex items-center gap-1.5 font-medium">
                               <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Düşünceler {msg.dur ? `· ${msg.dur} sn` : ''}</span>
+                              <span>
+                                {cText.thoughtsLabel}{' '}
+                                {msg.dur ? `· ${msg.dur} ${cText.secondsShort}` : ''}
+                              </span>
                             </span>
                             {expandedThoughts[msg.id] ? (
                               <ChevronUp className="w-3.5 h-3.5" />
@@ -1032,75 +1081,86 @@ export function ChatWorkspace({
                         </div>
                       )}
 
-                      {/* Web Searches and Sources */}
-                      {msg.searches && msg.searches.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 text-xs text-[var(--mut)] items-center">
-                          <Globe className="w-3.5 h-3.5 text-sky-500" />
-                          <span className="font-medium">Aramalar:</span>
-                          {msg.searches.map((s, i) => (
-                            <span
-                              key={i}
-                              className="px-2 py-0.5 rounded-full border border-[var(--bd)] bg-[var(--surf)] text-[11px]"
-                            >
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {msg.sources && msg.sources.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 text-xs">
-                          {msg.sources.map((src, i) => (
-                            <a
-                              key={i}
-                              href={src.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[var(--bd)] bg-[var(--card)] hover:border-[var(--tx)] text-[11px] text-[var(--tx)] transition-colors"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                              <span className="max-w-[180px] truncate">
-                                {src.title || src.url}
-                              </span>
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
                       {/* Content */}
                       <div className="text-[15px] sm:text-[14.5px] leading-[1.65] sm:leading-relaxed text-[var(--tx)] break-words">
-                        {renderMarkdown(msg.content)}
+                        {renderMarkdown(msg.content, {
+                          onOpenPreview: (code, language, blockIndex) =>
+                            openCodePreview(msg.content, code, language, blockIndex),
+                          openResultLabel: cText.codePreview.openResult,
+                          copyCodeLabel: cText.codePreview.copyCode,
+                          copiedCodeLabel: cText.codePreview.copiedCode,
+                          enablePreviewButtons: true,
+                        })}
                       </div>
 
                       {/* Action Tools */}
-                      <div className="flex items-center gap-2 pt-1 text-xs text-[var(--mut)]">
-                        <button
-                          onClick={() => handleCopyMessage(msg.id, msg.content)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-2 sm:py-1 rounded-lg hover:bg-[var(--surf)] hover:text-[var(--tx)] transition-colors cursor-pointer"
-                        >
-                          {copiedMessageId === msg.id ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-500" />
-                              <span className="text-emerald-500 font-medium">Kopyalandı</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>Kopyala</span>
-                            </>
-                          )}
-                        </button>
+                      {(() => {
+                        const previewableBlocks = extractCodeBlocks(msg.content).filter((b) =>
+                          isPreviewableCode(b.language, b.code)
+                        );
+                        const primaryBlock =
+                          previewableBlocks.find((b) =>
+                            ['html', 'jsx', 'tsx', 'react', 'svg', 'mermaid'].includes(b.language)
+                          ) || previewableBlocks[0];
 
-                        {idx === (currentChat?.messages?.length || 0) - 1 && (
-                          <button
-                            onClick={handleRegenerate}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-2 sm:py-1 rounded-lg hover:bg-[var(--surf)] hover:text-[var(--tx)] transition-colors cursor-pointer"
-                          >
-                            <RotateCw className="w-3 h-3" />
-                            <span>Yeniden oluştur</span>
-                          </button>
-                        )}
-                      </div>
+                        return (
+                          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-[var(--mut)]">
+                            <button
+                              onClick={() => handleCopyMessage(msg.id, msg.content)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-2 sm:py-1 rounded-lg hover:bg-[var(--surf)] hover:text-[var(--tx)] transition-colors cursor-pointer"
+                            >
+                              {copiedMessageId === msg.id ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-500" />
+                                  <span className="text-emerald-500 font-medium">{cText.copied}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>{cText.copy}</span>
+                                </>
+                              )}
+                            </button>
+
+                            {primaryBlock && (
+                              <button
+                                onClick={() =>
+                                  openCodePreview(
+                                    msg.content,
+                                    primaryBlock.code,
+                                    primaryBlock.language,
+                                    primaryBlock.index
+                                  )
+                                }
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-[var(--surf)] border border-[var(--bd)] text-[var(--tx)] hover:border-[var(--tx)] transition-colors cursor-pointer font-medium"
+                              >
+                                <Play className="w-3 h-3 fill-current" />
+                                <span>{cText.codePreview.openResult}</span>
+                              </button>
+                            )}
+
+                            {idx === (currentChat?.messages?.length || 0) - 1 && (
+                              <button
+                                onClick={handleRegenerate}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-2 sm:py-1 rounded-lg hover:bg-[var(--surf)] hover:text-[var(--tx)] transition-colors cursor-pointer"
+                              >
+                                <RotateCw className="w-3 h-3" />
+                                <span>{cText.regenerate}</span>
+                              </button>
+                            )}
+
+                            {msg.modelId && isValidChatModel(msg.modelId) && (
+                              <span
+                                className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-[var(--mut)]/90 select-none sm:ml-auto"
+                                title={getChatModelOption(msg.modelId).name}
+                              >
+                                <ModelLogo modelId={msg.modelId} className="w-3 h-3 shrink-0" />
+                                <span>{getChatModelOption(msg.modelId).shortName}</span>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -1119,30 +1179,19 @@ export function ChatWorkspace({
                     <div className="border border-[var(--bd)] rounded-xl bg-[var(--surf)]/70 p-3 text-xs text-[var(--mut)] space-y-1">
                       <div className="flex items-center gap-1.5 font-medium">
                         <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span className="animate-shimmer">Düşünüyor…</span>
+                        <span className="animate-shimmer">{cText.thinking}</span>
                       </div>
                       <p className="whitespace-pre-line leading-relaxed">{streamingThoughts}</p>
                     </div>
                   )}
 
-                  {streamingMeta.searches.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 text-xs text-[var(--mut)] items-center">
-                      <Globe className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                      <span className="font-medium">Web araması yapıldı:</span>
-                      {streamingMeta.searches.map((s, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 rounded-full border border-[var(--bd)] bg-[var(--surf)] text-[11px]"
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
                   {streamingText ? (
                     <div className="text-[15px] leading-[1.65] sm:leading-relaxed text-[var(--tx)] font-soft break-words">
-                      {renderMarkdown(streamingText)}
+                      {renderMarkdown(streamingText, {
+                        copyCodeLabel: cText.codePreview.copyCode,
+                        copiedCodeLabel: cText.codePreview.copiedCode,
+                        enablePreviewButtons: false,
+                      })}
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 py-2.5">
@@ -1192,7 +1241,7 @@ export function ChatWorkspace({
                     handleSendMessage();
                   }
                 }}
-                placeholder="Longclaw’a bir şey sor..."
+                placeholder={cText.inputPlaceholder}
                 className="w-full bg-transparent border-0 outline-none resize-none px-1 pb-2 text-base sm:text-sm leading-relaxed text-[var(--tx)] placeholder:text-[var(--mut)] max-h-44 min-h-[38px]"
               />
 
@@ -1203,7 +1252,7 @@ export function ChatWorkspace({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer shrink-0"
-                    title="Metin / Kod dosyası ekle"
+                    title={cText.attachFileTitle}
                   >
                     <Paperclip className="w-4 h-4" />
                   </button>
@@ -1216,7 +1265,7 @@ export function ChatWorkspace({
                       aria-expanded={modelMenuOpen}
                       aria-haspopup="listbox"
                       className="flex items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-2.5 sm:py-1.5 min-h-[40px] sm:min-h-0 rounded-full border border-[var(--bd)] bg-[var(--surf)]/70 hover:bg-[var(--surf)] hover:border-[var(--tx)] text-xs font-medium text-[var(--tx)] transition-all cursor-pointer whitespace-nowrap shrink-0"
-                      title="Kullanılacak modeli seç"
+                      title={cText.selectModelTitle}
                     >
                       <ModelLogo modelId={selectedModel} className="w-4 h-4 shrink-0" />
                       <span className="hidden sm:inline">{activeModel.name}</span>
@@ -1236,14 +1285,15 @@ export function ChatWorkspace({
                           exit={{ opacity: 0, y: 6, scale: 0.98 }}
                           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                           role="listbox"
-                          aria-label="Model seçimi"
+                          aria-label={cText.modelSelectionAria}
                           className="absolute left-[-46px] sm:left-0 bottom-12 sm:bottom-11 w-[min(20rem,calc(100vw-1.5rem))] sm:w-80 max-h-[min(70dvh,30rem)] overflow-y-auto rounded-2xl border border-[var(--bd)] bg-[var(--card)] p-1.5 shadow-xl z-50 space-y-1"
                         >
                           <div className="px-2.5 py-1.5 text-[11px] font-medium text-[var(--mut)]">
-                            Model seçin
+                            {cText.chooseModel}
                           </div>
                           {FAMILY_MODELS.map((m) => {
                             const isSelected = m.id === selectedModel;
+                            const localizedModel = t.models[m.id];
                             return (
                               <button
                                 key={m.id}
@@ -1267,11 +1317,11 @@ export function ChatWorkspace({
                                   <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--tx)]">
                                     <span className="truncate">{m.name}</span>
                                     <span className="text-[11px] font-normal text-[var(--mut)] shrink-0">
-                                      · {m.tagline}
+                                      · {localizedModel.tagline}
                                     </span>
                                   </div>
                                   <p className="text-[11px] text-[var(--mut)] leading-snug mt-0.5">
-                                    {m.description}
+                                    {localizedModel.description}
                                   </p>
                                 </div>
                                 {isSelected && (
@@ -1288,7 +1338,7 @@ export function ChatWorkspace({
                                 onClick={() => setOtherModelsOpen((prev) => !prev)}
                                 className="w-full flex items-center justify-between px-2.5 py-2 sm:py-1.5 rounded-xl text-[11px] font-medium text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]/50 transition-colors cursor-pointer"
                               >
-                                <span>Diğer modeller</span>
+                                <span>{cText.otherModels}</span>
                                 <ChevronDown
                                   className={`w-3.5 h-3.5 transition-transform duration-200 ${
                                     otherModelsOpen ? 'rotate-180' : ''
@@ -1299,6 +1349,7 @@ export function ChatWorkspace({
                               {otherModelsOpen &&
                                 OTHER_MODELS.map((m) => {
                                   const isSelected = m.id === selectedModel;
+                                  const localizedModel = t.models[m.id];
                                   return (
                                     <button
                                       key={m.id}
@@ -1322,11 +1373,11 @@ export function ChatWorkspace({
                                         <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--tx)]">
                                           <span className="truncate">{m.name}</span>
                                           <span className="text-[11px] font-normal text-[var(--mut)] shrink-0">
-                                            · {m.tagline}
+                                            · {localizedModel.tagline}
                                           </span>
                                         </div>
                                         <p className="text-[11px] text-[var(--mut)] leading-snug mt-0.5">
-                                          {m.description}
+                                          {localizedModel.description}
                                         </p>
                                       </div>
                                       {isSelected && (
@@ -1341,22 +1392,6 @@ export function ChatWorkspace({
                       )}
                     </AnimatePresence>
                   </div>
-
-                  {/* Web Search Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setWebSearch(!webSearch)}
-                    className={`flex items-center gap-1.5 px-3 py-2 sm:py-1.5 min-h-[40px] sm:min-h-0 rounded-full text-xs font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                      webSearch
-                        ? 'bg-sky-600 border-sky-600 text-white shadow-xs'
-                        : 'border-[var(--bd)] bg-[var(--surf)]/70 hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)]'
-                    }`}
-                    title="Google Arama ile güncel web bilgilerine eriş"
-                  >
-                    <Globe className="w-3.5 h-3.5 shrink-0" />
-                    <span className="hidden min-[380px]:inline">Web'de ara</span>
-                    <span className="min-[380px]:hidden">Web</span>
-                  </button>
                 </div>
 
                 {isStreaming ? (
@@ -1364,7 +1399,7 @@ export function ChatWorkspace({
                     type="button"
                     onClick={handleStopStreaming}
                     className="w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-red-500 text-white flex items-center justify-center shrink-0 hover:bg-red-600 transition-colors shadow-xs cursor-pointer"
-                    title="Yanıtı durdur"
+                    title={cText.stopTitle}
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
                   </button>
@@ -1374,7 +1409,7 @@ export function ChatWorkspace({
                     onClick={() => handleSendMessage()}
                     disabled={!inputMessage.trim()}
                     className="w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-[var(--ac)] text-[var(--on)] flex items-center justify-center shrink-0 hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
-                    title="Gönder"
+                    title={cText.sendTitle}
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -1383,22 +1418,39 @@ export function ChatWorkspace({
             </div>
 
             <div className="flex items-center justify-center sm:justify-between text-[11px] text-[var(--mut)] px-2">
-              <span className="hidden sm:inline">Enter ile gönder · Shift+Enter ile yeni satır</span>
+              <span className="hidden sm:inline">{cText.composerHint}</span>
               <span className="inline-flex items-center gap-1.5">
                 <ModelLogo modelId={selectedModel} className="w-3.5 h-3.5 shrink-0" />
                 <span>
                   {activeModel.name} ·{' '}
                   {depth === 'fast'
-                    ? 'Düşük Efor'
+                    ? cText.effortLow
                     : depth === 'deep'
-                    ? 'Yüksek Efor'
-                    : 'Dengeli Efor'}
+                    ? cText.effortHigh
+                    : cText.effortBalanced}
                 </span>
               </span>
             </div>
           </div>
         </div>
       </main>
+
+      {codePreview && (
+        <CodePreviewPanel
+          code={codePreview.code}
+          language={codePreview.language}
+          siblingCss={codePreview.siblingCss}
+          siblingJs={codePreview.siblingJs}
+          theme={theme}
+          lang={lang}
+          isExpanded={previewExpanded}
+          onToggleExpand={() => setPreviewExpanded((prev) => !prev)}
+          onClose={() => {
+            setCodePreview(null);
+            setPreviewExpanded(false);
+          }}
+        />
+      )}
     </div>
   );
 }

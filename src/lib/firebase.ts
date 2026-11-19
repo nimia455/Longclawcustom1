@@ -117,6 +117,7 @@ export interface ChatMessage {
   sources?: { url: string; title: string }[];
   dur?: number;
   stopped?: boolean;
+  modelId?: string;
   createdAt?: number;
 }
 

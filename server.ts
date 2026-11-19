@@ -111,36 +111,43 @@ const DEFAULT_PUBLIC_MODEL = 'longclaw-clawing-1.1-pro';
 const DEFAULT_BACKEND_MODEL = 'gemini-4-hydrogen';
 
 const PUBLIC_TO_BACKEND_MODEL: Record<string, string> = {
-  'longclaw-clawing-1': 'gemini-4-hydrogen',
-  'longclaw-clawing-1-pro': 'gemini-4-hydrogen',
-  'longclaw-clawing-1.1-pro': 'gemini-4-hydrogen',
+  'longclaw-clawing-1.2-ultra': 'gemini-4-hydrogen',
   'longclaw-clawing-1.1-ultra': 'gemini-4-hydrogen',
-  'longclaw-clawing-1-low': 'gemini-3.1-flash-lite',
+  'longclaw-clawing-1.1-pro': 'gemini-4-hydrogen',
+  'longclaw-clawing-1-pro': 'gemini-4-hydrogen',
+  'longclaw-clawing-1.1': 'gemini-4-hydrogen',
+  'longclaw-clawing-1.1-low': 'gemini-3.1-flash-lite',
 };
 
 function resolvePublicModel(requestedModel: unknown): string {
+  if (requestedModel === 'longclaw-clawing-1-low') {
+    return 'longclaw-clawing-1.1-low';
+  }
+  if (requestedModel === 'longclaw-clawing-1') {
+    return 'longclaw-clawing-1.1';
+  }
   if (typeof requestedModel === 'string' && requestedModel in PUBLIC_TO_BACKEND_MODEL) {
     return requestedModel;
   }
   return DEFAULT_PUBLIC_MODEL;
 }
 
+const TRIVIAL_CHAT_PATTERN =
+  /^(merhaba+|selam+|günaydın|iyi\s*(akşamlar|geceler|günler)|nasılsın\??|naber\??|ne\s*haber\??|teşekkür(ler| ederim)?|sağ\s*ol|eyvallah|tamam|ok(ay)?|peki|evet|hayır|görüşürüz|hoşça\s*kal|hi+|hello+|hey+|good\s*(morning|afternoon|evening|night)|how\s*are\s*you\??|thanks?(\s*you)?|bye|goodbye|yes|no|sure|hangi\s*modelsin\??|what\s*model\s*are\s*you\??|sen\s*kimsin\??|who\s*are\s*you\??)[!.\s?]*$/i;
+
 const COMPLEX_PROMPT_PATTERN =
-  /```|kod\s*yaz|kodu\s*yaz|script|algoritma|mimari|architecture|refactor|debug|hata\s*ayıkla|stack\s*trace|traceback|exception|analiz\s*et|analyze|karşılaştır|compare|kanıt|proof|türev|integral|denklem|equation|matrix|matris|sql|regex|docker|kubernetes|terraform|typescript|javascript|python|react|nextjs|api\s*tasar|adım\s*adım|step\s*by\s*step|detaylı|kapsamlı|araştır|makale|essay|özetle|summarize|çevir|translate|plan\s*hazırla|strateji/i;
+  /```|kod|code|script|algoritma|mimari|architecture|refactor|debug|hata\s*ayıkla|stack\s*trace|traceback|exception|analiz|analyze|karşılaştır|compare|kanıt|proof|prove|türev|integral|denklem|equation|matrix|matris|sql|regex|docker|kubernetes|terraform|typescript|javascript|python|react|nextjs|html|css|svg|api|adım\s*adım|step\s*by\s*step|detaylı|kapsamlı|araştır|makale|essay|özetle|summarize|çevir|translate|plan|strateji|neden|niçin|nasıl|açıkla|anlat|mantık|çöz|hesapla|fark|tasarla|oluştur|yaz|why|how|explain|solve|calculate|reason|difference|design|write|build|mmlu|fizik|kimya|biyoloji|matematik|tarih|felsefe|ekonomi|hukuk|physics|chemistry|biology|math|function|component/i;
 
 function isBasicQuestion(
   messages: Array<{ role?: string; content?: string }>,
-  depth: string,
-  web: boolean
+  depth: string
 ): boolean {
-  if (web) return false;
   const lastUser = [...messages].reverse().find((m) => m.role !== 'assistant');
   const text = (lastUser?.content || '').trim();
   if (!text) return true;
 
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
-  // Short greetings or 1-line everyday questions answer immediately without heavy thinking
-  if (text.length <= 45 && wordCount <= 7 && !COMPLEX_PROMPT_PATTERN.test(text)) {
+  // Greetings and direct identity questions always answer fast
+  if (TRIVIAL_CHAT_PATTERN.test(text)) {
     return true;
   }
 
@@ -148,10 +155,16 @@ function isBasicQuestion(
     return false;
   }
 
-  // Standard/fast everyday questions under ~180 chars without technical/analysis keywords skip heavy reasoning
+  if (depth === 'fast') {
+    return true;
+  }
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+  // Short casual statements/queries without reasoning/coding/math cues stay fast
   if (
-    text.length <= 180 &&
-    wordCount <= 28 &&
+    text.length <= 100 &&
+    wordCount <= 16 &&
     !text.includes('\n') &&
     !COMPLEX_PROMPT_PATTERN.test(text)
   ) {
@@ -168,7 +181,20 @@ function resolveBackendModel(publicModel: string, depth?: string, basicQuestion 
   return PUBLIC_TO_BACKEND_MODEL[publicModel] || DEFAULT_BACKEND_MODEL;
 }
 
-const SYSTEM_IDENTITY = `Kimliğin: Sen Longclaw adlı bir yapay zekâ asistanısın ve kendini her zaman Longclaw olarak tanıtırsın. Altyapın, hangi model ya da şirket tarafından çalıştığın gibi teknik ayrıntıları paylaşmazsın; sorulursa bunları paylaşmadığını söyle, ama yapay zekâ olduğunu asla inkâr etme. Kullanıcının yazdığı dilde yanıt ver. Kısa, açık ve samimi bir üslupla konuş. Basit sorularda gereksiz uzatmadan hemen ve net cevap ver.`;
+const PUBLIC_MODEL_DISPLAY_NAMES: Record<string, string> = {
+  'longclaw-clawing-1.2-ultra': 'Longclaw Clawing 1.2 Ultra',
+  'longclaw-clawing-1.1-ultra': 'Longclaw Clawing 1.1 Ultra',
+  'longclaw-clawing-1.1-pro': 'Longclaw Clawing 1.1 Pro',
+  'longclaw-clawing-1-pro': 'Longclaw Clawing 1 Pro',
+  'longclaw-clawing-1.1-low': 'Longclaw Clawing 1.1 Low',
+  'longclaw-clawing-1.1': 'Longclaw Clawing 1.1',
+};
+
+function buildSystemIdentity(publicModel: string): string {
+  const modelDisplayName =
+    PUBLIC_MODEL_DISPLAY_NAMES[publicModel] || 'Longclaw Clawing 1.1 Pro';
+  return `Sen Longclaw adlı yapay zekâ asistanısın. Normal yanıtlarda asla adını, kendini veya hangi model olduğunu durduk yere söyleme — kullanıcı sormadıkça kendini tanıtma ve doğrudan soruya odaklan. Yalnızca kullanıcı açıkça kim olduğunu veya hangi model olduğunu sorarsa ("hangi modelsin?", "what model are you?", "sen kimsin?" gibi), o zaman ${modelDisplayName} (Longclaw Clawing ailesi) olduğunu belirt; dahili API veya altyapı sağlayıcı ayrıntılarını paylaşma. Kullanıcının yazdığı dilde, kısa, net ve samimi yanıt ver.`;
+}
 
 const DEPTH_INSTRUCTIONS: Record<string, string> = {
   fast: 'Hızlı mod: Yanıtı kısa, net ve doğrudan tut; gereksiz giriş yapma.',
@@ -188,31 +214,32 @@ function getThinkingConfig(
   depth: string,
   basicQuestion = false
 ): { level: ThinkingLevel; includeThoughts: boolean } {
-  if (
-    basicQuestion ||
-    publicModel === 'longclaw-clawing-1-low' ||
-    backendModel === 'gemini-3.1-flash-lite'
-  ) {
-    if (!basicQuestion && depth === 'deep') {
-      return { level: ThinkingLevel.LOW, includeThoughts: false };
-    }
-    return { level: ThinkingLevel.MINIMAL, includeThoughts: false };
+  if (basicQuestion || depth === 'fast') {
+    return {
+      level: backendModel === 'gemini-3.1-flash-lite' ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW,
+      includeThoughts: false,
+    };
   }
 
   let config: { level: ThinkingLevel; includeThoughts: boolean };
 
-  if (publicModel === 'longclaw-clawing-1.1-ultra') {
+  if (backendModel === 'gemini-3.1-flash-lite' || publicModel === 'longclaw-clawing-1.1-low') {
+    config = {
+      level: ThinkingLevel.LOW,
+      includeThoughts: true,
+    };
+  } else if (
+    publicModel === 'longclaw-clawing-1.2-ultra' ||
+    publicModel === 'longclaw-clawing-1.1-ultra' ||
+    publicModel === 'longclaw-clawing-1.1-pro' ||
+    publicModel === 'longclaw-clawing-1-pro'
+  ) {
     config =
       depth === 'deep'
         ? { level: ThinkingLevel.MEDIUM, includeThoughts: true }
-        : { level: ThinkingLevel.LOW, includeThoughts: false };
-  } else if (publicModel === 'longclaw-clawing-1.1-pro' || publicModel === 'longclaw-clawing-1-pro') {
-    config =
-      depth === 'deep'
-        ? { level: ThinkingLevel.MEDIUM, includeThoughts: true }
-        : { level: ThinkingLevel.LOW, includeThoughts: false };
+        : { level: ThinkingLevel.LOW, includeThoughts: true };
   } else {
-    config = { level: ThinkingLevel.LOW, includeThoughts: false };
+    config = { level: ThinkingLevel.LOW, includeThoughts: true };
   }
 
   // gemini-4-hydrogen does not support ThinkingLevel.MINIMAL (returns HTTP 400)
@@ -223,24 +250,28 @@ function getThinkingConfig(
   return config;
 }
 
-function formatGeminiError(err: any): { status: number; message: string } {
-  const rawMsg = err?.message || String(err || 'Bilinmeyen bir hata oluştu.');
+function formatGeminiError(err: any, lang: 'en' | 'tr' = 'tr'): { status: number; message: string } {
+  const isEn = lang === 'en';
+  const rawMsg =
+    err?.message || String(err || (isEn ? 'An unknown error occurred.' : 'Bilinmeyen bir hata oluştu.'));
   const status = Number(err?.status || err?.code) || 500;
   const upper = rawMsg.toUpperCase();
 
   if (status === 429 || upper.includes('RESOURCE_EXHAUSTED') || upper.includes('QUOTA')) {
     return {
       status: 429,
-      message:
-        'API kullanım kotasına veya hız sınırına ulaşıldı (429 RESOURCE_EXHAUSTED). Lütfen birkaç saniye bekleyip tekrar deneyin veya Settings > Secrets panelinden API anahtarınızın kotasını kontrol edin.',
+      message: isEn
+        ? 'API quota or rate limit reached (429 RESOURCE_EXHAUSTED). Please wait a few seconds and try again or check your API key quota in Settings > Secrets.'
+        : 'API kullanım kotasına veya hız sınırına ulaşıldı (429 RESOURCE_EXHAUSTED). Lütfen birkaç saniye bekleyip tekrar deneyin veya Settings > Secrets panelinden API anahtarınızın kotasını kontrol edin.',
     };
   }
 
   if (status === 503 || upper.includes('UNAVAILABLE') || upper.includes('OVERLOADED')) {
     return {
       status: 503,
-      message:
-        'Yapay zekâ servisi şu anda yoğun (503). Lütfen birkaç saniye sonra tekrar deneyin.',
+      message: isEn
+        ? 'The AI service is currently busy (503). Please try again in a few seconds.'
+        : 'Yapay zekâ servisi şu anda yoğun (503). Lütfen birkaç saniye sonra tekrar deneyin.',
     };
   }
 
@@ -253,8 +284,9 @@ function formatGeminiError(err: any): { status: number; message: string } {
   ) {
     return {
       status: status === 400 ? 400 : 403,
-      message:
-        'Gemini API anahtarı geçersiz veya yetkisiz. Lütfen Settings > Secrets panelinden GEMINI_API_KEY ayarınızı kontrol edin.',
+      message: isEn
+        ? 'Gemini API key is invalid or unauthorized. Please check GEMINI_API_KEY in Settings > Secrets.'
+        : 'Gemini API anahtarı geçersiz veya yetkisiz. Lütfen Settings > Secrets panelinden GEMINI_API_KEY ayarınızı kontrol edin.',
     };
   }
 
@@ -266,15 +298,16 @@ function formatGeminiError(err: any): { status: number; message: string } {
 
 const FALLBACK_UNPAID_MODEL = 'gemini-3.1-flash-lite';
 
-function buildFallbackParams(params: any, depth?: string) {
+function buildFallbackParams(params: any, depth?: string, basicQuestion = false) {
+  const showThoughts = !basicQuestion && depth !== 'fast';
   return {
     ...params,
     model: FALLBACK_UNPAID_MODEL,
     config: {
       ...(params?.config || {}),
       thinkingConfig: {
-        thinkingLevel: depth === 'deep' ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
-        includeThoughts: false,
+        thinkingLevel: showThoughts ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+        includeThoughts: showThoughts,
       },
     },
   };
@@ -317,7 +350,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
-async function generateStreamWithFailover(params: any, depth?: string) {
+async function generateStreamWithFailover(
+  params: any,
+  depth?: string,
+  basicQuestion = false
+) {
   const configuredKeys = getConfiguredApiKeys();
   if (configuredKeys.length === 0) {
     throw new Error('GEMINI_API_KEY yapılandırılmamış.');
@@ -325,7 +362,7 @@ async function generateStreamWithFailover(params: any, depth?: string) {
 
   const attempts =
     params?.model && params.model !== FALLBACK_UNPAID_MODEL
-      ? [params, buildFallbackParams(params, depth)]
+      ? [params, buildFallbackParams(params, depth, basicQuestion)]
       : [params];
 
   let lastError: any = null;
@@ -456,27 +493,41 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 // Stream Gemini Chat completion
 app.post('/api/chat', async (req: Request, res: Response) => {
+  const uiLang: 'en' | 'tr' = req.body?.lang === 'en' ? 'en' : 'tr';
   try {
-    const { messages = [], depth = 'mid', mode = 'chat', web = false, model } = req.body;
-    const basicQuestion = isBasicQuestion(messages, depth, Boolean(web));
+    const { messages = [], depth = 'mid', mode = 'chat', model } = req.body;
+    const basicQuestion = isBasicQuestion(messages, depth);
     const publicModel = resolvePublicModel(model);
     const selectedModel = resolveBackendModel(publicModel, depth, basicQuestion);
 
     if (!messages.length) {
-      return res.status(400).json({ error: 'Mesaj listesi boş olamaz.' });
+      return res.status(400).json({
+        error: uiLang === 'en' ? 'Messages list cannot be empty.' : 'Mesaj listesi boş olamaz.',
+      });
     }
 
     if (getConfiguredApiKeys().length === 0) {
       return res.status(500).json({
         error:
-          'GEMINI_API_KEY yapılandırılmamış. Lütfen Settings > Secrets panelinden en az bir API anahtarı ekleyin.',
+          uiLang === 'en'
+            ? 'GEMINI_API_KEY is not configured. Please add at least one API key in Settings > Secrets.'
+            : 'GEMINI_API_KEY yapılandırılmamış. Lütfen Settings > Secrets panelinden en az bir API anahtarı ekleyin.',
       });
     }
 
     const depthInstruction = basicQuestion
       ? 'Hızlı yanıt: Soru basit olduğu için düşünmeden doğrudan, kısa ve net cevap ver.'
       : DEPTH_INSTRUCTIONS[depth] || DEPTH_INSTRUCTIONS.mid;
-    const systemPrompt = `${SYSTEM_IDENTITY}\n\nMod: ${MODE_INSTRUCTIONS[mode] || MODE_INSTRUCTIONS.chat}\nDerinlik: ${depthInstruction}`;
+    const ultraSpecialty =
+      !basicQuestion && publicModel === 'longclaw-clawing-1.2-ultra'
+        ? '\nUzmanlık: Karmaşık akademik, bilimsel, hukuki, teknik ve çoktan seçmeli (MMLU-Pro tarzı) sorularda seçenekleri titizlikle karşılaştırıp en doğru sonuca ulaş.'
+        : '';
+    const langHint =
+      uiLang === 'en'
+        ? '\nArayüz dili: İngilizce (ancak kullanıcı hangi dilde yazarsa o dilde yanıt ver).'
+        : '';
+    const systemIdentity = buildSystemIdentity(publicModel);
+    const systemPrompt = `${systemIdentity}${ultraSpecialty}${langHint}\n\nMod: ${MODE_INSTRUCTIONS[mode] || MODE_INSTRUCTIONS.chat}\nDerinlik: ${depthInstruction}`;
 
     // Format contents for @google/genai
     const contents = messages.map((m: { role: string; content: string }) => ({
@@ -495,25 +546,20 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       },
     };
 
-    if (web) {
-      config.tools = [{ googleSearch: {} }];
-    }
-
     const { iterator, firstResult } = await generateStreamWithFailover(
       {
         model: selectedModel,
         contents,
         config,
       },
-      depth
+      depth,
+      basicQuestion
     );
 
     // Set streaming headers (JSON Lines / ndjson) only after stream starts cleanly
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-
-    let collectedMetadataSent = false;
 
     const writeChunk = (chunk: any) => {
       const candidate = chunk?.candidates?.[0];
@@ -534,23 +580,6 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       if (!emittedFromParts && chunk?.text) {
         res.write(JSON.stringify({ t: 'tx', x: chunk.text }) + '\n');
       }
-
-      // Check grounding metadata (Google Search)
-      if (candidate?.groundingMetadata && !collectedMetadataSent) {
-        const gm = candidate.groundingMetadata as any;
-        const searches = gm.webSearchQueries || [];
-        const sources = (gm.groundingChunks || [])
-          .map((c: any) => ({
-            url: c.web?.uri || '',
-            title: c.web?.title || c.web?.uri || '',
-          }))
-          .filter((s: { url: string }) => !!s.url);
-
-        if (searches.length > 0 || sources.length > 0) {
-          res.write(JSON.stringify({ t: 'meta', searches, sources }) + '\n');
-          collectedMetadataSent = true;
-        }
-      }
     };
 
     if (!firstResult.done && firstResult.value) {
@@ -566,7 +595,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     res.end();
   } catch (err: any) {
     console.error('Gemini Chat error:', err);
-    const formatted = formatGeminiError(err);
+    const formatted = formatGeminiError(err, uiLang);
     if (res.headersSent) {
       res.write(JSON.stringify({ t: 'err', x: formatted.message }) + '\n');
       res.end();
@@ -578,10 +607,12 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 
 // Auto-title chat endpoint (uses fast unpaid model with multi-key failover and silent title fallback)
 app.post('/api/name-chat', async (req: Request, res: Response) => {
+  const uiLang: 'en' | 'tr' = req.body?.lang === 'en' ? 'en' : 'tr';
+  const fallbackDefault = uiLang === 'en' ? 'New chat' : 'Yeni sohbet';
   try {
     const { userMessage = '', assistantMessage = '' } = req.body;
     if (getConfiguredApiKeys().length === 0) {
-      return res.json({ title: userMessage.slice(0, 30) || 'Yeni sohbet' });
+      return res.json({ title: userMessage.slice(0, 30) || fallbackDefault });
     }
 
     const prompt = `Aşağıdaki konuşmanın ne hakkında olduğunu anla ve ona 2-4 kelimelik kısa, net bir başlık ver (kullanıcının dilinde). Tırnak, nokta, emoji ve fazladan açıklama olmadan SADECE başlığı yaz.
@@ -605,10 +636,10 @@ Asistan: ${assistantMessage.slice(0, 600)}`;
       .replace(/^["'“”’.\s]+|["'“”’.\s]+$/g, '')
       .slice(0, 40);
 
-    res.json({ title: cleanTitle || userMessage.slice(0, 30) || 'Yeni sohbet' });
+    res.json({ title: cleanTitle || userMessage.slice(0, 30) || fallbackDefault });
   } catch (err: any) {
     console.log('[Longclaw] Auto-title fallback used:', err?.status || err?.code || 'ERR');
-    res.json({ title: req.body?.userMessage?.slice(0, 30) || 'Yeni sohbet' });
+    res.json({ title: req.body?.userMessage?.slice(0, 30) || fallbackDefault });
   }
 });
 

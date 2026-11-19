@@ -15,6 +15,7 @@ import { ChatWorkspace } from './components/ChatWorkspace';
 import { AuthModal } from './components/AuthModal';
 import { LegalModal, LegalDocType } from './components/LegalModal';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { Language, TRANSLATIONS, getInitialLanguage } from './lib/i18n';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -45,6 +46,10 @@ export default function App() {
     }
   });
 
+  // Language state ('en' | 'tr')
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const t = TRANSLATIONS[lang];
+
   // Sidebar & composer focus state
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
     try {
@@ -64,6 +69,14 @@ export default function App() {
       localStorage.setItem('lc_theme', theme);
     } catch {}
   }, [theme]);
+
+  // Sync language with DOM and localStorage
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    try {
+      localStorage.setItem('lc_lang', lang);
+    } catch {}
+  }, [lang]);
 
   // Persist desktop sidebar state
   useEffect(() => {
@@ -111,13 +124,13 @@ export default function App() {
             await auth.currentUser.reload();
             await syncUserProfile(auth.currentUser);
           }
-          setActionBanner('E-posta adresiniz başarıyla doğrulandı!');
+          setActionBanner(TRANSLATIONS[getInitialLanguage()].app.emailVerifiedBanner);
           setTimeout(() => setActionBanner(null), 5000);
           window.history.replaceState({}, document.title, window.location.pathname);
         })
         .catch((err) => {
           console.error('Email verification link error:', err);
-          setActionBanner('E-posta doğrulama bağlantısı geçersiz veya süresi dolmuş.');
+          setActionBanner(TRANSLATIONS[getInitialLanguage()].app.emailVerifyErrorBanner);
           setTimeout(() => setActionBanner(null), 5000);
         });
     } else if (mode === 'resetPassword') {
@@ -169,7 +182,7 @@ export default function App() {
           const initialChat: ChatSession = {
             id: `chat-${Date.now()}`,
             userId: user.uid,
-            title: 'Yeni sohbet',
+            title: TRANSLATIONS[getInitialLanguage()].common.newChat,
             mode: 'chat',
             depth: 'mid',
             pin: false,
@@ -198,7 +211,7 @@ export default function App() {
     const newChat: ChatSession = {
       id: `chat-${Date.now()}`,
       userId: user?.uid || 'guest',
-      title: 'Yeni sohbet',
+      title: t.common.newChat,
       mode: 'chat',
       depth: 'mid',
       pin: false,
@@ -402,6 +415,8 @@ export default function App() {
           onOpenLegal={(type) => setLegalModalType(type)}
           theme={theme}
           onToggleTheme={toggleTheme}
+          lang={lang}
+          onChangeLang={setLang}
         />
       ) : (
         <ChatWorkspace
@@ -418,6 +433,8 @@ export default function App() {
           onDeleteAccount={handleDeleteAccount}
           theme={theme}
           onToggleTheme={toggleTheme}
+          lang={lang}
+          onChangeLang={setLang}
           onBackToLanding={() => setView('landing')}
           sidebarOpen={sidebarOpen}
           onOpenSidebar={() => setSidebarOpen(true)}
@@ -434,6 +451,7 @@ export default function App() {
         isOpen={authModalOpen}
         initialTab={authModalTab}
         initialResetCode={initialResetCode}
+        lang={lang}
         onClose={() => {
           setAuthModalOpen(false);
           setInitialResetCode(null);
@@ -447,7 +465,7 @@ export default function App() {
       />
 
       {/* Legal & Compliance Modal */}
-      <LegalModal type={legalModalType} onClose={() => setLegalModalType(null)} />
+      <LegalModal type={legalModalType} lang={lang} onClose={() => setLegalModalType(null)} />
     </div>
   );
 }

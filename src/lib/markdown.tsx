@@ -1,4 +1,89 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Check, Copy, Play } from 'lucide-react';
+import {
+  isPreviewableCode,
+  normalizeCodeLanguage,
+} from './codeRunner';
+
+export interface MarkdownRenderOptions {
+  onOpenPreview?: (code: string, language: string, blockIndex: number) => void;
+  openResultLabel?: string;
+  copyCodeLabel?: string;
+  copiedCodeLabel?: string;
+  enablePreviewButtons?: boolean;
+}
+
+interface CodeBlockProps {
+  language: string;
+  code: string;
+  blockIndex: number;
+  options?: MarkdownRenderOptions;
+}
+
+function CodeBlock({ language, code, blockIndex, options }: CodeBlockProps) {
+  const [copied, setCopied] = useState(false);
+  const detectedLang = normalizeCodeLanguage(language, code);
+  const displayLang = language || detectedLang;
+  const canPreview =
+    options?.enablePreviewButtons !== false &&
+    Boolean(options?.onOpenPreview) &&
+    isPreviewableCode(language, code);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <div className="my-3 w-full max-w-full rounded-xl overflow-hidden border border-[var(--bd)] bg-[var(--surf)]">
+      <div className="px-3.5 py-2 border-b border-[var(--bd)] bg-[var(--bg)]/60 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-mono text-[var(--mut)] uppercase tracking-wider truncate">
+          {displayLang || 'code'}
+        </span>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer whitespace-nowrap"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-500" />
+                <span className="text-emerald-500">
+                  {options?.copiedCodeLabel || 'Copied'}
+                </span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>{options?.copyCodeLabel || 'Copy'}</span>
+              </>
+            )}
+          </button>
+
+          {canPreview && (
+            <button
+              type="button"
+              onClick={() =>
+                options?.onOpenPreview?.(code, detectedLang || language, blockIndex)
+              }
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--ac)] text-[var(--on)] text-[11px] font-medium hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+            >
+              <Play className="w-3 h-3 fill-current" />
+              <span>{options?.openResultLabel || 'Open result'}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <pre className="p-3.5 overflow-x-auto max-w-full text-xs font-mono text-[var(--tx)] leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
 
 function escapeHtml(str: string): string {
   return str
@@ -9,14 +94,18 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export function renderMarkdown(content: string): React.ReactNode {
+export function renderMarkdown(
+  content: string,
+  options?: MarkdownRenderOptions
+): React.ReactNode {
   if (!content) return null;
 
   // Split content by code blocks first
   const parts: React.ReactNode[] = [];
-  const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
+  const codeBlockRegex = /```([^\n`]*)\n?([\s\S]*?)```/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
+  let blockIndex = 0;
 
   while ((match = codeBlockRegex.exec(content)) !== null) {
     // Content before code block
@@ -24,19 +113,18 @@ export function renderMarkdown(content: string): React.ReactNode {
       parts.push(renderTextSegment(content.slice(lastIndex, match.index), lastIndex));
     }
 
-    const lang = match[1] || '';
+    const lang = (match[1] || '').trim();
     const code = match[2] || '';
+    const currentIdx = blockIndex++;
+
     parts.push(
-      <div key={`code-${match.index}`} className="my-3 w-full max-w-full rounded-xl overflow-hidden border border-[var(--bd)] bg-[var(--surf)]">
-        {lang && (
-          <div className="px-3.5 py-1.5 border-b border-[var(--bd)] bg-[var(--bg)]/50 text-[11px] font-mono text-[var(--mut)] uppercase tracking-wider">
-            {lang}
-          </div>
-        )}
-        <pre className="p-3.5 overflow-x-auto max-w-full text-xs font-mono text-[var(--tx)] leading-relaxed">
-          <code>{code}</code>
-        </pre>
-      </div>
+      <CodeBlock
+        key={`code-${match.index}-${currentIdx}`}
+        language={lang}
+        code={code}
+        blockIndex={currentIdx}
+        options={options}
+      />
     );
 
     lastIndex = match.index + match[0].length;

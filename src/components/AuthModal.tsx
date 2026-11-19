@@ -27,11 +27,13 @@ import {
 } from '../lib/firebase';
 import { GoogleIcon, AppleIcon } from './Icons';
 import { LegalDocType } from './LegalModal';
+import { Language, TRANSLATIONS } from '../lib/i18n';
 
 interface AuthModalProps {
   isOpen: boolean;
   initialTab?: 'in' | 'up';
   initialResetCode?: string | null;
+  lang: Language;
   onClose: () => void;
   onSuccess: () => void;
   onOpenLegal: (type: LegalDocType) => void;
@@ -43,10 +45,15 @@ export function AuthModal({
   isOpen,
   initialTab = 'in',
   initialResetCode = null,
+  lang,
   onClose,
   onSuccess,
   onOpenLegal,
 }: AuthModalProps) {
+  const t = TRANSLATIONS[lang];
+  const a = t.auth;
+  const errs = a.errors;
+
   const [viewMode, setViewMode] = useState<AuthViewMode>(initialResetCode ? 'forgot' : 'email');
   const [tab, setTab] = useState<'in' | 'up'>(initialTab);
 
@@ -98,11 +105,11 @@ export function AuthModal({
     } catch (err: any) {
       console.error('Google auth error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
-        setError('Giriş penceresi kapatıldı.');
+        setError(errs.popupClosed);
       } else if (err.code === 'auth/account-exists-with-different-credential') {
-        setError('Bu e-posta adresiyle başka bir oturum sağlayıcısı ilişkilendirilmiş.');
+        setError(errs.accountExistsDifferentCred);
       } else {
-        setError(err.message || 'Google ile giriş yapılırken bir sorun oluştu.');
+        setError(err.message || errs.googleGeneric);
       }
     } finally {
       setLoading(false);
@@ -121,11 +128,11 @@ export function AuthModal({
     } catch (err: any) {
       console.error('Apple auth error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
-        setError('Apple giriş penceresi kapatıldı.');
+        setError(errs.applePopupClosed);
       } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Apple ile giriş Firebase konsolunda etkinleştirilmemiş.');
+        setError(errs.appleNotAllowed);
       } else {
-        setError(err.message || 'Apple ile giriş yapılırken bir hata oluştu.');
+        setError(err.message || errs.appleGeneric);
       }
     } finally {
       setLoading(false);
@@ -138,17 +145,17 @@ export function AuthModal({
 
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !/^\S+@\S+\.\S+$/.test(cleanEmail)) {
-      setError('Lütfen geçerli bir e-posta adresi girin.');
+      setError(errs.invalidEmail);
       return;
     }
 
     if (password.length < 6) {
-      setError('Şifre en az 6 karakter olmalıdır.');
+      setError(errs.shortPassword);
       return;
     }
 
     if (tab === 'up' && !acceptTos) {
-      setError('Devam etmek için Kullanım Şartları ve Gizlilik Politikasını kabul etmelisiniz.');
+      setError(errs.acceptTos);
       return;
     }
 
@@ -165,7 +172,7 @@ export function AuthModal({
           console.warn('Email verification dispatch error:', verifyErr);
         }
         await syncUserProfile(res.user);
-        setInfo('Hesabınız oluşturuldu ve e-posta adresinize doğrulama bağlantısı gönderildi.');
+        setInfo(errs.accountCreatedInfo);
         setTimeout(() => onSuccess(), 900);
       } else {
         const res = await signInWithEmailAndPassword(auth, cleanEmail, password);
@@ -175,15 +182,15 @@ export function AuthModal({
     } catch (err: any) {
       console.error('Email auth error:', err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('Bu e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.');
+        setError(errs.emailInUse);
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-        setError('E-posta veya şifre hatalı.');
+        setError(errs.invalidCredential);
       } else if (err.code === 'auth/user-not-found') {
-        setError('Bu e-posta ile kayıtlı bir hesap bulunamadı.');
+        setError(errs.userNotFound);
       } else if (err.code === 'auth/operation-not-allowed') {
-        setError('E-posta/şifre girişi Firebase Console > Authentication üzerinden etkinleştirilmelidir.');
+        setError(errs.operationNotAllowed);
       } else {
-        setError(err.message || 'İşlem sırasında bir hata oluştu.');
+        setError(err.message || errs.genericAuth);
       }
     } finally {
       setLoading(false);
@@ -197,7 +204,7 @@ export function AuthModal({
 
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !/^\S+@\S+\.\S+$/.test(cleanEmail)) {
-      setError('Doğrulama e-postası için lütfen geçerli bir e-posta adresi girin.');
+      setError(errs.invalidEmailReset);
       return;
     }
 
@@ -205,15 +212,13 @@ export function AuthModal({
       setLoading(true);
       await sendPasswordResetEmail(auth, cleanEmail);
       setForgotStep('verify');
-      setInfo(
-        `${cleanEmail} adresine şifre sıfırlama ve e-posta doğrulama bağlantısı gönderildi. Gelen kutunuzdaki bağlantıya tıklayın veya bağlantıdaki doğrulama kodunu aşağıya girin.`
-      );
+      setInfo(errs.resetSentInfo(cleanEmail));
     } catch (err: any) {
       console.error('Password reset error:', err);
       if (err.code === 'auth/user-not-found') {
-        setError('Bu e-posta adresine kayıtlı bir kullanıcı bulunamadı.');
+        setError(errs.resetUserNotFound);
       } else {
-        setError('Doğrulama e-postası gönderilemedi: ' + (err.message || 'Hata oluştu'));
+        setError(errs.resetSendFailed(err.message || errs.genericAuth));
       }
     } finally {
       setLoading(false);
@@ -226,7 +231,6 @@ export function AuthModal({
     resetMessages();
 
     let cleanCode = resetCode.trim();
-    // Extract oobCode automatically if the user pasted the entire verification URL
     if (cleanCode.includes('oobCode=')) {
       try {
         const parsed = new URL(cleanCode);
@@ -238,12 +242,12 @@ export function AuthModal({
     }
 
     if (!cleanCode) {
-      setError('Lütfen e-postanızdaki doğrulama kodunu veya bağlantısını yapıştırın.');
+      setError(errs.missingResetCode);
       return;
     }
 
     if (newPassword.length < 6) {
-      setError('Yeni şifreniz en az 6 karakter olmalıdır.');
+      setError(errs.shortNewPassword);
       return;
     }
 
@@ -252,9 +256,7 @@ export function AuthModal({
       const verifiedEmail = await verifyPasswordResetCode(auth, cleanCode);
       setVerifiedResetEmail(verifiedEmail);
       await confirmPasswordReset(auth, cleanCode, newPassword);
-      setInfo(
-        `${verifiedEmail} hesabı doğrulandı ve şifreniz güncellendi! Şimdi yeni şifrenizle giriş yapabilirsiniz.`
-      );
+      setInfo(errs.resetSuccessInfo(verifiedEmail));
       setEmail(verifiedEmail);
       setPassword('');
       setNewPassword('');
@@ -267,11 +269,11 @@ export function AuthModal({
     } catch (err: any) {
       console.error('Reset verification error:', err);
       if (err.code === 'auth/expired-action-code') {
-        setError('Doğrulama kodunun süresi dolmuş. Lütfen yeni bir doğrulama e-postası isteyin.');
+        setError(errs.expiredActionCode);
       } else if (err.code === 'auth/invalid-action-code') {
-        setError('Geçersiz veya daha önce kullanılmış doğrulama kodu.');
+        setError(errs.invalidActionCode);
       } else {
-        setError(err.message || 'Şifre sıfırlama doğrulanamadı.');
+        setError(err.message || errs.resetVerifyFailed);
       }
     } finally {
       setLoading(false);
@@ -300,19 +302,15 @@ export function AuthModal({
             <button
               onClick={onClose}
               className="absolute top-5 right-5 p-2 rounded-full hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer"
-              aria-label="Kapat"
+              aria-label={t.common.close}
             >
               <X className="w-5 h-5" />
             </button>
 
             <h3 className="font-serif-fraunces text-2xl font-semibold text-center mb-1">
-              {viewMode === 'forgot'
-                ? 'Şifre Sıfırlama & Doğrulama'
-                : 'Longclaw’a Hoş Geldin'}
+              {viewMode === 'forgot' ? a.titleForgot : a.titleDefault}
             </h3>
-            <p className="text-xs text-[var(--mut)] text-center mb-5">
-              Google Firebase & Gemini destekli akıllı asistan
-            </p>
+            <p className="text-xs text-[var(--mut)] text-center mb-5">{a.subtitle}</p>
 
             <AnimatePresence mode="wait">
               {/* Sub-view: Forgot Password with Email Verification */}
@@ -325,145 +323,142 @@ export function AuthModal({
                   transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                   className="space-y-4"
                 >
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode('email');
-                setForgotStep('request');
-                resetMessages();
-              }}
-              className="inline-flex items-center gap-1.5 text-xs text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Giriş ekranına dön</span>
-            </button>
-
-            {forgotStep === 'request' ? (
-              <form onSubmit={handleSendPasswordReset} className="space-y-3">
-                <p className="text-xs text-[var(--mut)] leading-relaxed">
-                  Hesabınıza kayıtlı e-posta adresinizi girin. Kimliğinizi doğrulamanız için size bir
-                  doğrulama ve şifre sıfırlama bağlantısı göndereceğiz.
-                </p>
-
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5 sm:top-3.5" />
-                  <input
-                    type="email"
-                    placeholder="E-posta adresiniz"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    required
-                    className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
-                  />
-                </div>
-
-                {error && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {info && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-xs">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>{info}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md"
-                >
-                  {loading ? 'Gönderiliyor...' : 'Doğrulama E-postası Gönder'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotStep('verify');
-                    resetMessages();
-                  }}
-                  className="w-full text-center text-xs text-[var(--mut)] hover:text-[var(--tx)] pt-1 cursor-pointer"
-                >
-                  Zaten doğrulama kodun var mı? Kodu gir
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleConfirmResetCode} className="space-y-3">
-                <div className="p-3 rounded-xl bg-[var(--surf)] border border-[var(--bd)] text-xs text-[var(--mut)] space-y-1">
-                  <div className="flex items-center gap-1.5 text-[var(--tx)] font-medium">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                    <span>E-posta Doğrulama Adımı</span>
-                  </div>
-                  <p className="leading-relaxed">
-                    {verifiedResetEmail
-                      ? `${verifiedResetEmail} adresi doğrulandı. Yeni şifrenizi belirleyin.`
-                      : 'E-postanızdaki sıfırlama bağlantısına doğrudan tıklayabilir veya bağlantıdaki doğrulama kodunu aşağıya yapıştırarak şifrenizi yenileyebilirsiniz.'}
-                  </p>
-                </div>
-
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
-                  <input
-                    type="text"
-                    placeholder="E-postadaki doğrulama kodu veya bağlantısı"
-                    value={resetCode}
-                    onChange={(e) => setResetCode(e.target.value)}
-                    required
-                    className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
-                  />
-                </div>
-
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
-                  <input
-                    type="password"
-                    placeholder="Yeni şifre (en az 6 karakter)"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                    className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
-                  />
-                </div>
-
-                {error && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {info && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-xs">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>{info}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md"
-                >
-                  {loading ? 'Doğrulanıyor...' : 'E-postayı Doğrula ve Şifreyi Güncelle'}
-                </button>
-
-                {email && (
                   <button
                     type="button"
-                    onClick={() => handleSendPasswordReset()}
-                    disabled={loading}
-                    className="w-full text-center text-xs text-[var(--mut)] hover:text-[var(--tx)] pt-1 cursor-pointer"
+                    onClick={() => {
+                      setViewMode('email');
+                      setForgotStep('request');
+                      resetMessages();
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer"
                   >
-                    Doğrulama e-postasını tekrar gönder
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>{a.backToSignIn}</span>
                   </button>
-                )}
-                </form>
-              )}
+
+                  {forgotStep === 'request' ? (
+                    <form onSubmit={handleSendPasswordReset} className="space-y-3">
+                      <p className="text-xs text-[var(--mut)] leading-relaxed">{a.forgotDesc}</p>
+
+                      <div className="relative">
+                        <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5 sm:top-3.5" />
+                        <input
+                          type="email"
+                          placeholder={a.emailPlaceholder}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          autoComplete="email"
+                          required
+                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                        />
+                      </div>
+
+                      {error && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{error}</span>
+                        </div>
+                      )}
+
+                      {info && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-xs">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>{info}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                      >
+                        {loading ? a.sending : a.sendVerificationEmail}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotStep('verify');
+                          resetMessages();
+                        }}
+                        className="w-full text-center text-xs text-[var(--mut)] hover:text-[var(--tx)] pt-1 cursor-pointer"
+                      >
+                        {a.haveCodePrompt}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleConfirmResetCode} className="space-y-3">
+                      <div className="p-3 rounded-xl bg-[var(--surf)] border border-[var(--bd)] text-xs text-[var(--mut)] space-y-1">
+                        <div className="flex items-center gap-1.5 text-[var(--tx)] font-medium">
+                          <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                          <span>{a.verificationStepTitle}</span>
+                        </div>
+                        <p className="leading-relaxed">
+                          {verifiedResetEmail
+                            ? a.verificationStepVerified(verifiedResetEmail)
+                            : a.verificationStepDefault}
+                        </p>
+                      </div>
+
+                      <div className="relative">
+                        <KeyRound className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                        <input
+                          type="text"
+                          placeholder={a.codePlaceholder}
+                          value={resetCode}
+                          onChange={(e) => setResetCode(e.target.value)}
+                          required
+                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                        <input
+                          type="password"
+                          placeholder={a.newPasswordPlaceholder}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          autoComplete="new-password"
+                          required
+                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                        />
+                      </div>
+
+                      {error && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{error}</span>
+                        </div>
+                      )}
+
+                      {info && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-xs">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>{info}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                      >
+                        {loading ? a.verifying : a.verifyAndUpdatePassword}
+                      </button>
+
+                      {email && (
+                        <button
+                          type="button"
+                          onClick={() => handleSendPasswordReset()}
+                          disabled={loading}
+                          className="w-full text-center text-xs text-[var(--mut)] hover:text-[var(--tx)] pt-1 cursor-pointer"
+                        >
+                          {a.resendVerificationEmail}
+                        </button>
+                      )}
+                    </form>
+                  )}
                 </motion.div>
               )}
 
@@ -485,7 +480,7 @@ export function AuthModal({
                       className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-full border border-[var(--bd)] bg-[var(--card)] hover:bg-[var(--surf)] text-[var(--tx)] font-medium text-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
                     >
                       <GoogleIcon className="w-4 h-4" />
-                      <span>Google ile Devam Et</span>
+                      <span>{a.continueWithGoogle}</span>
                     </button>
 
                     <button
@@ -495,166 +490,165 @@ export function AuthModal({
                       className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-full border border-[var(--bd)] bg-[var(--card)] hover:bg-[var(--surf)] text-[var(--tx)] font-medium text-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
                     >
                       <AppleIcon className="w-4 h-4" />
-                      <span>Apple ile Giriş Yap</span>
+                      <span>{a.continueWithApple}</span>
                     </button>
                   </div>
 
-            {/* Divider */}
-            <div className="relative flex items-center justify-center my-4">
-              <div className="w-full border-t border-[var(--bd)]" />
-              <span className="absolute px-3 bg-[var(--card)] text-xs text-[var(--mut)]">
-                veya e-posta ile
-              </span>
-            </div>
+                  {/* Divider */}
+                  <div className="relative flex items-center justify-center my-4">
+                    <div className="w-full border-t border-[var(--bd)]" />
+                    <span className="absolute px-3 bg-[var(--card)] text-xs text-[var(--mut)]">
+                      {a.orWithEmail}
+                    </span>
+                  </div>
 
-            {/* Tabs */}
-            <div className="flex bg-[var(--surf)] rounded-full p-1 mb-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setTab('in');
-                  resetMessages();
-                }}
-                className={`flex-1 py-2 text-xs font-medium rounded-full transition-all cursor-pointer ${
-                  tab === 'in'
-                    ? 'bg-[var(--card)] text-[var(--tx)] shadow-xs'
-                    : 'text-[var(--mut)] hover:text-[var(--tx)]'
-                }`}
-              >
-                Giriş yap
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab('up');
-                  resetMessages();
-                }}
-                className={`flex-1 py-2 text-xs font-medium rounded-full transition-all cursor-pointer ${
-                  tab === 'up'
-                    ? 'bg-[var(--card)] text-[var(--tx)] shadow-xs'
-                    : 'text-[var(--mut)] hover:text-[var(--tx)]'
-                }`}
-              >
-                Kayıt ol
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleEmailAuth} className="space-y-3">
-              {tab === 'up' && (
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
-                  <input
-                    type="text"
-                    placeholder="Adın"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    autoComplete="name"
-                    className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
-                  />
-                </div>
-              )}
-
-              <div className="relative">
-                <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
-                <input
-                  type="email"
-                  placeholder="E-posta"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  required
-                  className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
-                />
-              </div>
-
-              <div className="relative">
-                <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
-                <input
-                  type="password"
-                  placeholder="Şifre (en az 6 karakter)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={tab === 'up' ? 'new-password' : 'current-password'}
-                  required
-                  className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
-                />
-              </div>
-
-              {tab === 'in' && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewMode('forgot');
-                      setForgotStep('request');
-                      resetMessages();
-                    }}
-                    className="text-xs text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer"
-                  >
-                    Şifremi unuttum (E-posta ile doğrula)
-                  </button>
-                </div>
-              )}
-
-              {tab === 'up' && (
-                <label className="flex items-start gap-2.5 text-xs text-[var(--mut)] cursor-pointer mt-1">
-                  <input
-                    type="checkbox"
-                    checked={acceptTos}
-                    onChange={(e) => setAcceptTos(e.target.checked)}
-                    className="mt-0.5 rounded border-[var(--bd)] accent-[var(--tx)]"
-                  />
-                  <span>
+                  {/* Tabs */}
+                  <div className="flex bg-[var(--surf)] rounded-full p-1 mb-4">
                     <button
                       type="button"
-                      onClick={() => onOpenLegal('sartlar')}
-                      className="underline hover:text-[var(--tx)] text-[var(--tx)] font-medium"
+                      onClick={() => {
+                        setTab('in');
+                        resetMessages();
+                      }}
+                      className={`flex-1 py-2 text-xs font-medium rounded-full transition-all cursor-pointer ${
+                        tab === 'in'
+                          ? 'bg-[var(--card)] text-[var(--tx)] shadow-xs'
+                          : 'text-[var(--mut)] hover:text-[var(--tx)]'
+                      }`}
                     >
-                      Kullanım Şartları
+                      {a.tabSignIn}
                     </button>
-                    ’nı ve{' '}
                     <button
                       type="button"
-                      onClick={() => onOpenLegal('gizlilik')}
-                      className="underline hover:text-[var(--tx)] text-[var(--tx)] font-medium"
+                      onClick={() => {
+                        setTab('up');
+                        resetMessages();
+                      }}
+                      className={`flex-1 py-2 text-xs font-medium rounded-full transition-all cursor-pointer ${
+                        tab === 'up'
+                          ? 'bg-[var(--card)] text-[var(--tx)] shadow-xs'
+                          : 'text-[var(--mut)] hover:text-[var(--tx)]'
+                      }`}
                     >
-                      Gizlilik Politikası
+                      {a.tabSignUp}
                     </button>
-                    ’nı okudum, kabul ediyorum.
-                  </span>
-                </label>
-              )}
+                  </div>
 
-              {error && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
+                  {/* Form */}
+                  <form onSubmit={handleEmailAuth} className="space-y-3">
+                    {tab === 'up' && (
+                      <div className="relative">
+                        <UserIcon className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                        <input
+                          type="text"
+                          placeholder={a.namePlaceholder}
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          autoComplete="name"
+                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                        />
+                      </div>
+                    )}
 
-              {info && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-xs">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{info}</span>
-                </div>
-              )}
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                      <input
+                        type="email"
+                        placeholder={a.emailShortPlaceholder}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
+                        required
+                        className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                      />
+                    </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md mt-2"
-              >
-                {loading ? 'İşleniyor...' : tab === 'up' ? 'Hesap oluştur' : 'Giriş yap'}
-              </button>
-            </form>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                      <input
+                        type="password"
+                        placeholder={a.passwordPlaceholder}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete={tab === 'up' ? 'new-password' : 'current-password'}
+                        required
+                        className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                      />
+                    </div>
+
+                    {tab === 'in' && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setViewMode('forgot');
+                            setForgotStep('request');
+                            resetMessages();
+                          }}
+                          className="text-xs text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer"
+                        >
+                          {a.forgotPasswordLink}
+                        </button>
+                      </div>
+                    )}
+
+                    {tab === 'up' && (
+                      <label className="flex items-start gap-2.5 text-xs text-[var(--mut)] cursor-pointer mt-1">
+                        <input
+                          type="checkbox"
+                          checked={acceptTos}
+                          onChange={(e) => setAcceptTos(e.target.checked)}
+                          className="mt-0.5 rounded border-[var(--bd)] accent-[var(--tx)]"
+                        />
+                        <span>
+                          {a.tosPrefix}
+                          <button
+                            type="button"
+                            onClick={() => onOpenLegal('sartlar')}
+                            className="underline hover:text-[var(--tx)] text-[var(--tx)] font-medium"
+                          >
+                            {a.tosTerms}
+                          </button>
+                          {a.tosAnd}
+                          <button
+                            type="button"
+                            onClick={() => onOpenLegal('gizlilik')}
+                            className="underline hover:text-[var(--tx)] text-[var(--tx)] font-medium"
+                          >
+                            {a.tosPrivacy}
+                          </button>
+                          {a.tosSuffix}
+                        </span>
+                      </label>
+                    )}
+
+                    {error && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{error}</span>
+                      </div>
+                    )}
+
+                    {info && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-xs">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>{info}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md mt-2"
+                    >
+                      {loading ? a.processing : tab === 'up' ? a.createAccount : a.signInBtn}
+                    </button>
+                  </form>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <p className="text-[11px] text-[var(--mut)] text-center mt-5">
-              Verileriniz Firebase Firestore üzerinde şifrelenir ve korunur.
-            </p>
+            <p className="text-[11px] text-[var(--mut)] text-center mt-5">{a.footerSecurity}</p>
           </motion.div>
         </motion.div>
       )}

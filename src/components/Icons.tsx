@@ -17,11 +17,13 @@ export function LongclawLogo({ className = 'w-7 h-7' }: { className?: string }) 
   );
 }
 
+const useSafeId = () => useId().replace(/[^a-zA-Z0-9_-]/g, '');
+
 /**
  * Official Google Gemini 4-color sparkle logo (used on Landing Page)
  */
 export function GeminiLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useId();
+  const id = useSafeId();
   const clipId = `gemini-clip-${id}`;
   const redGradId = `gemini-red-${id}`;
   const yellowGradId = `gemini-yellow-${id}`;
@@ -63,7 +65,7 @@ export function GeminiLogo({ className = 'w-4 h-4' }: { className?: string }) {
  * Longclaw Clawing 1 Pro: Interlocking Longclaw rings with warm amber-indigo metallic gradient
  */
 export function ClawingProLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useId();
+  const id = useSafeId();
   const gradId = `clawing-pro-${id}`;
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -85,25 +87,51 @@ export function ClawingProLogo({ className = 'w-4 h-4' }: { className?: string }
 }
 
 /**
- * Longclaw Clawing 1 Low: Lightweight sky-emerald gradient Longclaw rings
+ * Longclaw Clawing 1.1 Low: Sleek 3-stop cyan-emerald-lime gradient Longclaw rings
  */
-export function ClawingLowLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useId();
-  const gradId = `clawing-low-${id}`;
+export function Clawing11LowLogo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const gradId = `clawing-11-low-${id}`;
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0EA5E9" />
-          <stop offset="100%" stopColor="#10B981" />
+          <stop offset="0%" stopColor="#06B6D4" />
+          <stop offset="55%" stopColor="#10B981" />
+          <stop offset="100%" stopColor="#84CC16" />
         </linearGradient>
       </defs>
-      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.4" />
-      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.4" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.2" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.4" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.2" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.4" />
+      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.4" />
+      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.4" />
+      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+    </svg>
+  );
+}
+
+/**
+ * Longclaw Clawing 1.2 Ultra: Bold crimson-gold-violet prism Longclaw rings
+ */
+export function Clawing12UltraLogo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const gradId = `clawing-12-ultra-${id}`;
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#F43F5E" />
+          <stop offset="50%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#8B5CF6" />
+        </linearGradient>
+      </defs>
+      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="4" />
+      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="4" />
+      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.8" />
+      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="4" />
+      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.8" />
+      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="4" />
     </svg>
   );
 }
@@ -112,7 +140,7 @@ export function ClawingLowLogo({ className = 'w-4 h-4' }: { className?: string }
  * Longclaw Clawing 1.1 Ultra: Interlocking Longclaw rings with violet-magenta-cyan prism gradient
  */
 export function ClawingUltraLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useId();
+  const id = useSafeId();
   const gradId = `clawing-ultra-${id}`;
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -137,7 +165,7 @@ export function ClawingUltraLogo({ className = 'w-4 h-4' }: { className?: string
  * Longclaw Clawing 1.1 Pro: Interlocking Longclaw rings with sky-indigo-amber next-gen gradient
  */
 export function Clawing11ProLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useId();
+  const id = useSafeId();
   const gradId = `clawing-11-pro-${id}`;
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -158,6 +186,31 @@ export function Clawing11ProLogo({ className = 'w-4 h-4' }: { className?: string
   );
 }
 
+/**
+ * Longclaw Clawing 1.1: Clean steel-blue-teal gradient Longclaw rings
+ */
+export function Clawing11Logo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const gradId = `clawing-11-${id}`;
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#38BDF8" />
+          <stop offset="55%" stopColor="#3B82F6" />
+          <stop offset="100%" stopColor="#14B8A6" />
+        </linearGradient>
+      </defs>
+      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.4" />
+      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.4" />
+      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+    </svg>
+  );
+}
+
 export function ModelLogo({
   modelId,
   className = 'w-4 h-4',
@@ -165,6 +218,9 @@ export function ModelLogo({
   modelId: ChatModelId;
   className?: string;
 }) {
+  if (modelId === 'longclaw-clawing-1.2-ultra') {
+    return <Clawing12UltraLogo className={className} />;
+  }
   if (modelId === 'longclaw-clawing-1.1-ultra') {
     return <ClawingUltraLogo className={className} />;
   }
@@ -174,8 +230,11 @@ export function ModelLogo({
   if (modelId === 'longclaw-clawing-1-pro') {
     return <ClawingProLogo className={className} />;
   }
-  if (modelId === 'longclaw-clawing-1-low') {
-    return <ClawingLowLogo className={className} />;
+  if (modelId === 'longclaw-clawing-1.1-low') {
+    return <Clawing11LowLogo className={className} />;
+  }
+  if (modelId === 'longclaw-clawing-1.1') {
+    return <Clawing11Logo className={className} />;
   }
   return <LongclawLogo className={className} />;
 }
