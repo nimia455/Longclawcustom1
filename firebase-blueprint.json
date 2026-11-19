@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile document containing account metadata",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "phoneNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "emailVerified": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "email", "createdAt", "updatedAt"]
+    },
+    "ChatSession": {
+      "title": "ChatSession",
+      "description": "User chat conversation session with messages and settings",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["chat", "sum", "write"]
+        },
+        "depth": {
+          "type": "string",
+          "enum": ["fast", "mid", "deep"]
+        },
+        "pin": {
+          "type": "boolean"
+        },
+        "messages": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "userId", "title", "mode", "depth", "createdAt", "updatedAt"]
+    },
+    "TestConnection": {
+      "title": "TestConnection",
+      "description": "Smoke test connection health verification document",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profiles with owner-only access"
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": "ChatSession",
+      "description": "Stores conversation sessions for a specific user"
+    },
+    "/test/{docId}": {
+      "schema": "TestConnection",
+      "description": "Test collection for SDK connectivity checks"
+    }
+  }
+}
