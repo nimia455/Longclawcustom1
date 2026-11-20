@@ -3,6 +3,7 @@ import { Download, Maximize2, X, Check, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { GeneratedImageData } from '../lib/firebase';
 import { Language } from '../lib/i18n';
+import { apiUrl, isStaticHostWithoutBackend } from '../lib/api';
 
 // In-memory cache so newly generated images render instantaneously without a second round-trip
 const generatedImageDataUrlCache = new Map<string, string>();
@@ -61,7 +62,8 @@ export function GeneratedImageCard({ image, lang }: GeneratedImageCardProps) {
     if (image.url) {
       const cached = generatedImageDataUrlCache.get(image.url);
       if (cached) return cached;
-      return `/api/image-proxy?url=${encodeURIComponent(image.url)}`;
+      if (isStaticHostWithoutBackend()) return image.url;
+      return apiUrl(`/api/image-proxy?url=${encodeURIComponent(image.url)}`);
     }
     if (image.svg) {
       try {

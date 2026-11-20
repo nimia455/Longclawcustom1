@@ -1,4 +1,5 @@
 import { Language } from './i18n';
+import { apiUrl, getStaticHostNotice, isStaticHostWithoutBackend } from './api';
 import {
   buildGmailSearchQueryFromPrompt,
   createGmailDraft,
@@ -172,7 +173,11 @@ export async function runWorkspaceSlashCommand(params: {
     Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const nowIso = getLocalIsoWithOffset(new Date());
 
-  const planRes = await fetch('/api/workspace-command', {
+  if (isStaticHostWithoutBackend()) {
+    throw new Error(getStaticHostNotice(lang));
+  }
+
+  const planRes = await fetch(apiUrl('/api/workspace-command'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal,
@@ -185,6 +190,10 @@ export async function runWorkspaceSlashCommand(params: {
       lang,
     }),
   });
+
+  if (planRes.status === 404 && !import.meta.env.VITE_API_BASE_URL) {
+    throw new Error(getStaticHostNotice(lang));
+  }
 
   const plan = await planRes.json().catch(() => ({}));
   if (!planRes.ok || !plan?.operation) {

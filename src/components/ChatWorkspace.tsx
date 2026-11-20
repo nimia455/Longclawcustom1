@@ -73,6 +73,7 @@ import {
   getAllSlashCommands,
   parseSlashCommandInput,
 } from '../lib/commands';
+import { apiUrl, getStaticHostNotice, isStaticHostWithoutBackend } from '../lib/api';
 import {
   buildGmailSearchQueryFromPrompt,
   createGmailDraft,
@@ -980,8 +981,11 @@ export function ChatWorkspace({
 
       // Background Gemini Image Generation path (free-tier Gemini, no extra/paid image API)
       if (wantsImage) {
+        if (isStaticHostWithoutBackend()) {
+          throw new Error(getStaticHostNotice(lang));
+        }
         const effectiveImagePrompt = imagePromptOverride || promptForApi;
-        const imgRes = await fetch('/api/generate-image', {
+        const imgRes = await fetch(apiUrl('/api/generate-image'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: abortControllerRef.current.signal,
@@ -991,6 +995,10 @@ export function ChatWorkspace({
             lang,
           }),
         });
+
+        if (imgRes.status === 404 && !import.meta.env.VITE_API_BASE_URL) {
+          throw new Error(getStaticHostNotice(lang));
+        }
 
         const imgData = await imgRes.json().catch(() => ({}));
         if (!imgRes.ok || (!imgData?.imageUrl && !imgData?.svg)) {
@@ -1219,7 +1227,11 @@ export function ChatWorkspace({
         }
       }
 
-      const response = await fetch('/api/chat', {
+      if (isStaticHostWithoutBackend()) {
+        throw new Error(getStaticHostNotice(lang));
+      }
+
+      const response = await fetch(apiUrl('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortControllerRef.current.signal,
@@ -1248,6 +1260,9 @@ export function ChatWorkspace({
       });
 
       if (!response.ok) {
+        if (response.status === 404 && !import.meta.env.VITE_API_BASE_URL) {
+          throw new Error(getStaticHostNotice(lang));
+        }
         const errJson = await response.json().catch(() => ({}));
         throw new Error(errJson.error || `HTTP ${response.status}`);
       }
@@ -1314,7 +1329,7 @@ export function ChatWorkspace({
         void (async () => {
           let newTitle = displayText.slice(0, 30);
           try {
-            const titleRes = await fetch('/api/name-chat', {
+            const titleRes = await fetch(apiUrl('/api/name-chat'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
