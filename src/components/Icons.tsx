@@ -4,23 +4,33 @@ import type { ChatModelId } from '../lib/models';
 const GEMINI_OFFICIAL_PATH =
   'M14 28C14 26.0633 13.6267 24.2433 12.88 22.54C12.1567 20.8367 11.165 19.355 9.905 18.095C8.645 16.835 7.16333 15.8433 5.46 15.12C3.75667 14.3733 1.93667 14 0 14C1.93667 14 3.75667 13.6383 5.46 12.915C7.16333 12.1683 8.645 11.165 9.905 9.905C11.165 8.645 12.1567 7.16333 12.88 5.46C13.6267 3.75667 14 1.93667 14 0C14 1.93667 14.3617 3.75667 15.085 5.46C15.8317 7.16333 16.835 8.645 18.095 9.905C19.355 11.165 20.8367 12.1683 22.54 12.915C24.2433 13.6383 26.0633 14 28 14C26.0633 14 24.2433 14.3733 22.54 15.12C20.8367 15.8433 19.355 16.835 18.095 18.095C16.835 19.355 15.8317 20.8367 15.085 22.54C14.3617 24.2433 14 26.0633 14 28Z';
 
+const useSafeId = () => useId().replace(/[^a-zA-Z0-9_-]/g, '');
+
+const LONGCLAW_RING_PATHS = [
+  'M10.98 23.76A7.8 7.8 0 1 1 18.93 19.17',
+  'M21.02 8.24A7.8 7.8 0 1 1 13.07 12.83',
+] as const;
+
 export function LongclawLogo({ className = 'w-7 h-7' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 32 32" fill="none">
-      <circle cx="11.5" cy="16" r="8.5" stroke="currentColor" strokeWidth="3.6" />
-      <circle cx="20.5" cy="16" r="8.5" stroke="currentColor" strokeWidth="3.6" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="currentColor" strokeWidth="3.6" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="currentColor" strokeWidth="3.6" />
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <g transform="rotate(-14 16 16)">
+        {LONGCLAW_RING_PATHS.map((d, idx) => (
+          <path
+            key={idx}
+            d={d}
+            stroke="currentColor"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+          />
+        ))}
+      </g>
     </svg>
   );
 }
 
-const useSafeId = () => useId().replace(/[^a-zA-Z0-9_-]/g, '');
-
 /**
- * Official Google Gemini 4-color sparkle logo (used on Landing Page)
+ * Official Google Gemini 4-color sparkle logo (used in Benchmark comparison)
  */
 export function GeminiLogo({ className = 'w-4 h-4' }: { className?: string }) {
   const id = useSafeId();
@@ -62,151 +72,286 @@ export function GeminiLogo({ className = 'w-4 h-4' }: { className?: string }) {
 }
 
 /**
- * Longclaw Clawing 1 Pro: Interlocking Longclaw rings with warm amber-indigo metallic gradient
- */
-export function ClawingProLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useSafeId();
-  const gradId = `clawing-pro-${id}`;
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#F59E0B" />
-          <stop offset="55%" stopColor="#EA580C" />
-          <stop offset="100%" stopColor="#6366F1" />
-        </linearGradient>
-      </defs>
-      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-    </svg>
-  );
-}
-
-/**
- * Longclaw Clawing 1.1 Low: Sleek 3-stop cyan-emerald-lime gradient Longclaw rings
- */
-export function Clawing11LowLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useSafeId();
-  const gradId = `clawing-11-low-${id}`;
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#06B6D4" />
-          <stop offset="55%" stopColor="#10B981" />
-          <stop offset="100%" stopColor="#84CC16" />
-        </linearGradient>
-      </defs>
-      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-    </svg>
-  );
-}
-
-/**
- * Longclaw Clawing 1.2 Ultra: Bold crimson-gold-violet prism Longclaw rings
+ * Longclaw Clawing 1.2 Ultra: Signature interlocking rings in flagship prism violet-cyan-gold gradient
  */
 export function Clawing12UltraLogo({ className = 'w-4 h-4' }: { className?: string }) {
   const id = useSafeId();
-  const gradId = `clawing-12-ultra-${id}`;
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#F43F5E" />
-          <stop offset="50%" stopColor="#F59E0B" />
-          <stop offset="100%" stopColor="#8B5CF6" />
-        </linearGradient>
-      </defs>
-      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="4" />
-      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="4" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.8" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="4" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.8" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="4" />
-    </svg>
-  );
-}
+  const ring1 = `c12u-r1-${id}`;
+  const ring2 = `c12u-r2-${id}`;
+  const glint = `c12u-gl-${id}`;
 
-/**
- * Longclaw Clawing 1.1 Ultra: Interlocking Longclaw rings with violet-magenta-cyan prism gradient
- */
-export function ClawingUltraLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useSafeId();
-  const gradId = `clawing-ultra-${id}`;
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <defs>
-        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#7C3AED" />
-          <stop offset="50%" stopColor="#EC4899" />
+        <linearGradient id={ring1} x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#6D28D9" />
+          <stop offset="52%" stopColor="#4F46E5" />
           <stop offset="100%" stopColor="#06B6D4" />
         </linearGradient>
-      </defs>
-      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.8" />
-      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.8" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.6" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.8" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.6" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.8" />
-    </svg>
-  );
-}
-
-/**
- * Longclaw Clawing 1.1 Pro: Interlocking Longclaw rings with sky-indigo-amber next-gen gradient
- */
-export function Clawing11ProLogo({ className = 'w-4 h-4' }: { className?: string }) {
-  const id = useSafeId();
-  const gradId = `clawing-11-pro-${id}`;
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0EA5E9" />
-          <stop offset="55%" stopColor="#6366F1" />
+        <linearGradient id={ring2} x1="28" y1="5" x2="5" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#F59E0B" />
+          <stop offset="48%" stopColor="#EC4899" />
+          <stop offset="100%" stopColor="#7C3AED" />
+        </linearGradient>
+        <linearGradient id={glint} x1="21" y1="2" x2="29" y2="10" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FDE68A" />
           <stop offset="100%" stopColor="#F59E0B" />
         </linearGradient>
       </defs>
-      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.7" />
-      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.7" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.5" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.7" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.5" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.7" />
+      <g transform="rotate(-14 16 16)">
+        <path
+          d={LONGCLAW_RING_PATHS[0]}
+          stroke={`url(#${ring1})`}
+          strokeWidth="3.35"
+          strokeLinecap="round"
+        />
+        <path
+          d={LONGCLAW_RING_PATHS[1]}
+          stroke={`url(#${ring2})`}
+          strokeWidth="3.35"
+          strokeLinecap="round"
+        />
+      </g>
+      <path
+        d="M25.5 2.5L26.55 5.45L29.5 6.5L26.55 7.55L25.5 10.5L24.45 7.55L21.5 6.5L24.45 5.45L25.5 2.5Z"
+        fill={`url(#${glint})`}
+      />
     </svg>
   );
 }
 
 /**
- * Longclaw Clawing 1.1: Clean steel-blue-teal gradient Longclaw rings
+ * Longclaw Clawing 1.2 Pro: Signature interlocking rings in crisp cobalt-sapphire-sky gradient
  */
-export function Clawing11Logo({ className = 'w-4 h-4' }: { className?: string }) {
+export function Clawing12ProLogo({ className = 'w-4 h-4' }: { className?: string }) {
   const id = useSafeId();
-  const gradId = `clawing-11-${id}`;
+  const ring1 = `c12p-r1-${id}`;
+  const ring2 = `c12p-r2-${id}`;
+
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <defs>
-        <linearGradient id={gradId} x1="3" y1="6" x2="29" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#38BDF8" />
+        <linearGradient id={ring1} x1="4" y1="4" x2="27" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#1D4ED8" />
+          <stop offset="55%" stopColor="#2563EB" />
+          <stop offset="100%" stopColor="#38BDF8" />
+        </linearGradient>
+        <linearGradient id={ring2} x1="28" y1="5" x2="6" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#6366F1" />
           <stop offset="55%" stopColor="#3B82F6" />
-          <stop offset="100%" stopColor="#14B8A6" />
+          <stop offset="100%" stopColor="#0284C7" />
         </linearGradient>
       </defs>
-      <circle cx="11.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <circle cx="20.5" cy="16" r="8.5" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M13 7.6A8.5 8.5 0 0 1 18.4 11" stroke={`url(#${gradId})`} strokeWidth="3.6" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke="var(--bg)" strokeWidth="6.4" />
-      <path d="M19 24.4A8.5 8.5 0 0 1 13.5 20.9" stroke={`url(#${gradId})`} strokeWidth="3.6" />
+      <g transform="rotate(-14 16 16)">
+        <path
+          d={LONGCLAW_RING_PATHS[0]}
+          stroke={`url(#${ring1})`}
+          strokeWidth="3.3"
+          strokeLinecap="round"
+        />
+        <path
+          d={LONGCLAW_RING_PATHS[1]}
+          stroke={`url(#${ring2})`}
+          strokeWidth="3.3"
+          strokeLinecap="round"
+        />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Longclaw Clawing 1.1 Ultra: Signature interlocking rings in royal amethyst-violet-magenta gradient
+ */
+export function ClawingUltraLogo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const ring1 = `c11u-r1-${id}`;
+  const ring2 = `c11u-r2-${id}`;
+
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={ring1} x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#581C87" />
+          <stop offset="55%" stopColor="#7C3AED" />
+          <stop offset="100%" stopColor="#C084FC" />
+        </linearGradient>
+        <linearGradient id={ring2} x1="27" y1="5" x2="5" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#EC4899" />
+          <stop offset="55%" stopColor="#9333EA" />
+          <stop offset="100%" stopColor="#6D28D9" />
+        </linearGradient>
+      </defs>
+      <g transform="rotate(-14 16 16)">
+        <path
+          d={LONGCLAW_RING_PATHS[0]}
+          stroke={`url(#${ring1})`}
+          strokeWidth="3.3"
+          strokeLinecap="round"
+        />
+        <path
+          d={LONGCLAW_RING_PATHS[1]}
+          stroke={`url(#${ring2})`}
+          strokeWidth="3.3"
+          strokeLinecap="round"
+        />
+      </g>
+      <circle cx="16" cy="16" r="1.75" fill={`url(#${ring2})`} />
+    </svg>
+  );
+}
+
+/**
+ * Longclaw Clawing 1.1 Pro: Signature interlocking rings in deep teal-emerald gradient
+ */
+export function Clawing11ProLogo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const ring1 = `c11p-r1-${id}`;
+  const ring2 = `c11p-r2-${id}`;
+
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={ring1} x1="4" y1="5" x2="27" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0F766E" />
+          <stop offset="55%" stopColor="#0D9488" />
+          <stop offset="100%" stopColor="#10B981" />
+        </linearGradient>
+        <linearGradient id={ring2} x1="28" y1="5" x2="5" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#34D399" />
+          <stop offset="100%" stopColor="#047857" />
+        </linearGradient>
+      </defs>
+      <g transform="rotate(-14 16 16)">
+        <path
+          d={LONGCLAW_RING_PATHS[0]}
+          stroke={`url(#${ring1})`}
+          strokeWidth="3.25"
+          strokeLinecap="round"
+        />
+        <path
+          d={LONGCLAW_RING_PATHS[1]}
+          stroke={`url(#${ring2})`}
+          strokeWidth="3.25"
+          strokeLinecap="round"
+        />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Longclaw Clawing 1 Pro: Signature interlocking rings in heritage amber-bronze gradient
+ */
+export function ClawingProLogo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const ring1 = `c1p-r1-${id}`;
+  const ring2 = `c1p-r2-${id}`;
+
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={ring1} x1="4" y1="4" x2="27" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#B45309" />
+          <stop offset="55%" stopColor="#D97706" />
+          <stop offset="100%" stopColor="#F59E0B" />
+        </linearGradient>
+        <linearGradient id={ring2} x1="28" y1="5" x2="5" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FBBF24" />
+          <stop offset="100%" stopColor="#C2410C" />
+        </linearGradient>
+      </defs>
+      <g transform="rotate(-14 16 16)">
+        <path
+          d={LONGCLAW_RING_PATHS[0]}
+          stroke={`url(#${ring1})`}
+          strokeWidth="3.25"
+          strokeLinecap="round"
+        />
+        <path
+          d={LONGCLAW_RING_PATHS[1]}
+          stroke={`url(#${ring2})`}
+          strokeWidth="3.25"
+          strokeLinecap="round"
+        />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Longclaw Clawing 1.1 Low: Nimble interlocking rings in brisk sky-mint velocity gradient
+ */
+export function Clawing11LowLogo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const ring1 = `c11l-r1-${id}`;
+  const ring2 = `c11l-r2-${id}`;
+
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={ring1} x1="4" y1="5" x2="28" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0284C7" />
+          <stop offset="55%" stopColor="#06B6D4" />
+          <stop offset="100%" stopColor="#2DD4BF" />
+        </linearGradient>
+        <linearGradient id={ring2} x1="28" y1="5" x2="5" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#22C55E" />
+          <stop offset="100%" stopColor="#38BDF8" />
+        </linearGradient>
+      </defs>
+      <g transform="rotate(-14 16 16)">
+        <path
+          d={LONGCLAW_RING_PATHS[0]}
+          stroke={`url(#${ring1})`}
+          strokeWidth="2.95"
+          strokeLinecap="round"
+        />
+        <path
+          d={LONGCLAW_RING_PATHS[1]}
+          stroke={`url(#${ring2})`}
+          strokeWidth="2.95"
+          strokeLinecap="round"
+        />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Longclaw Clawing 1.1: Classic interlocking rings in refined architectural titanium gradient
+ */
+export function Clawing11Logo({ className = 'w-4 h-4' }: { className?: string }) {
+  const id = useSafeId();
+  const ring1 = `c11-r1-${id}`;
+  const ring2 = `c11-r2-${id}`;
+
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={ring1} x1="4" y1="4" x2="27" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#52525B" />
+          <stop offset="100%" stopColor="#A1A1AA" />
+        </linearGradient>
+        <linearGradient id={ring2} x1="27" y1="5" x2="5" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#71717A" />
+          <stop offset="100%" stopColor="#D4D4D8" />
+        </linearGradient>
+      </defs>
+      <g transform="rotate(-14 16 16)">
+        <path
+          d={LONGCLAW_RING_PATHS[0]}
+          stroke={`url(#${ring1})`}
+          strokeWidth="3.2"
+          strokeLinecap="round"
+        />
+        <path
+          d={LONGCLAW_RING_PATHS[1]}
+          stroke={`url(#${ring2})`}
+          strokeWidth="3.2"
+          strokeLinecap="round"
+        />
+      </g>
     </svg>
   );
 }
@@ -220,6 +365,9 @@ export function ModelLogo({
 }) {
   if (modelId === 'longclaw-clawing-1.2-ultra') {
     return <Clawing12UltraLogo className={className} />;
+  }
+  if (modelId === 'longclaw-clawing-1.2-pro') {
+    return <Clawing12ProLogo className={className} />;
   }
   if (modelId === 'longclaw-clawing-1.1-ultra') {
     return <ClawingUltraLogo className={className} />;
@@ -237,6 +385,94 @@ export function ModelLogo({
     return <Clawing11Logo className={className} />;
   }
   return <LongclawLogo className={className} />;
+}
+
+/**
+ * Refined Precision UI Symbols (24x24 optical grid, 1.75 stroke weight)
+ */
+export function FastDepthIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M13.2 2.8L5.6 13.1H11.6L10.8 21.2L18.4 10.9H12.4L13.2 2.8Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function BalancedDepthIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="12" cy="12" r="2.75" fill="currentColor" />
+      <path
+        d="M12 3.75V6.5M12 17.5V20.25M3.75 12H6.5M17.5 12H20.25"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function DeepDepthIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 3.2L20.2 7.8L12 12.4L3.8 7.8L12 3.2Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.2 12.4L12 16.8L19.8 12.4"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.2 16.6L12 21L19.8 16.6"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function ReasoningIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.65" strokeOpacity="0.45" />
+      <path
+        d="M12 5.4L13.55 10.45L18.6 12L13.55 13.55L12 18.6L10.45 13.55L5.4 12L10.45 10.45L12 5.4Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+export function ConnectorsIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="2.2" stroke="currentColor" strokeWidth="1.75" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="2.2" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="17" cy="7" r="3.4" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="7" cy="17" r="3.4" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M10.5 7H13.6M10.4 17H13.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 /**
@@ -339,6 +575,107 @@ export function AppleIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.63 1.35-.56.65-1.05 1.71-.92 2.73 1.01.08 2.01-.48 2.62-1.23z" />
+    </svg>
+  );
+}
+
+export function GmailIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M3.6 20h2.8v-7.5L2 9.2v9.2C2 19.28 2.72 20 3.6 20z"
+      />
+      <path
+        fill="#34A853"
+        d="M17.6 20h2.8c.88 0 1.6-.72 1.6-1.6V9.2l-4.4 3.3V20z"
+      />
+      <path
+        fill="#FBBC04"
+        d="M17.6 5.6v6.9L22 9.2V7.07c0-1.98-2.26-3.11-3.84-1.92l-.56.45z"
+      />
+      <path
+        fill="#EA4335"
+        d="M6.4 12.5V5.6L12 9.8l5.6-4.2v6.9L12 16.7l-5.6-4.2z"
+      />
+      <path
+        fill="#C5221F"
+        d="M2 7.07V9.2l4.4 3.3V5.6l-.56-.45C4.26 3.96 2 5.09 2 7.07z"
+      />
+    </svg>
+  );
+}
+
+export function GoogleCalendarIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="3.5" width="18" height="17.5" rx="3" fill="#4285F4" />
+      <rect x="6" y="6.8" width="12" height="11" rx="1.2" fill="#FFFFFF" />
+      <path d="M16 17.8h5v-3.5L17.5 17.8H16z" fill="#EA4335" />
+      <path d="M3 17.8h3v3.2H5a2 2 0 0 1-2-2v-1.2z" fill="#1967D2" />
+      <path d="M6 17.8h10v3.2H6v-3.2z" fill="#34A853" />
+      <path d="M18 6.8h3v7.8h-3V6.8z" fill="#FBBC04" />
+      {/* Crisp vector "31" numerals */}
+      <path
+        d="M8.7 10.3h2.3c.65 0 1.05.35 1.05.88 0 .45-.28.76-.73.85.52.1.85.46.85.98 0 .64-.5 1.07-1.25 1.07H8.65"
+        stroke="#1967D2"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.6 12.05h1.2"
+        stroke="#1967D2"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14.1 10.9l1.05-.65v3.85"
+        stroke="#1967D2"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function GoogleDriveIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path fill="#FFC107" d="M8.6 3.5h6.8l6.3 10.9h-6.8L8.6 3.5z" />
+      <path fill="#0F9D58" d="M2.3 14.4L8.6 3.5l3.4 5.9-6.3 10.9-3.4-5.9z" />
+      <path fill="#4285F4" d="M5.7 20.3l3.4-5.9h12.6l-3.4 5.9H5.7z" />
+    </svg>
+  );
+}
+
+export function GoogleDocsIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M6 2.5h8l5 5v12.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-15.5a2 2 0 0 1 2-2z"
+      />
+      <path fill="#A1C2FA" d="M14 2.5l5 5h-5v-5z" />
+      <rect x="7.5" y="10.8" width="9" height="1.5" rx="0.75" fill="#FFFFFF" />
+      <rect x="7.5" y="13.9" width="9" height="1.5" rx="0.75" fill="#FFFFFF" />
+      <rect x="7.5" y="17" width="5.8" height="1.5" rx="0.75" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
+export function GoogleTasksIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.4" fill="#4285F4" />
+      <path
+        d="M7.8 12.2l2.9 2.9 5.6-6.2"
+        stroke="#FFFFFF"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

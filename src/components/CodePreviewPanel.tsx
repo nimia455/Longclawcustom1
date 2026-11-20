@@ -135,33 +135,31 @@ export function CodePreviewPanel({
     <div
       className={
         isExpanded
-          ? 'fixed inset-0 z-50 flex flex-col bg-[var(--bg)] text-[var(--tx)]'
-          : 'fixed inset-0 z-40 lg:static lg:z-auto lg:w-[48%] lg:min-w-[420px] lg:max-w-[740px] flex flex-col bg-[var(--bg)] text-[var(--tx)] lg:border-l border-[var(--bd)] h-full shrink-0'
+          ? 'fixed inset-0 z-50 h-[100dvh] flex flex-col bg-[var(--bg)] text-[var(--tx)]'
+          : 'fixed inset-0 z-40 h-[100dvh] lg:h-full lg:static lg:z-auto lg:w-[48%] lg:min-w-[420px] lg:max-w-[740px] flex flex-col bg-[var(--bg)] text-[var(--tx)] lg:border-l border-[var(--bd)] shrink-0'
       }
     >
       {/* Panel Header */}
-      <header className="h-14 px-3 sm:px-4 border-b border-[var(--bd)] bg-[var(--bg)] flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[var(--tx)] truncate">
-              <span>{cp.liveResultTitle}</span>
-              <span className="text-[var(--mut)]" aria-hidden="true">
-                ·
-              </span>
-              <span className="font-mono text-xs uppercase text-[var(--mut)]">
-                {normalizedLang}
-              </span>
-            </div>
-          </div>
+      <header className="min-h-14 pt-[env(safe-area-inset-top)] px-3 sm:px-4 border-b border-[var(--bd)]/75 bg-[var(--bg)] flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="hidden sm:inline text-sm font-medium text-[var(--tx)] truncate">
+            {cp.liveResultTitle}
+          </span>
+          <span className="hidden sm:inline text-[var(--mut)]" aria-hidden="true">
+            ·
+          </span>
+          <span className="font-mono text-xs font-medium uppercase text-[var(--mut)] truncate">
+            {normalizedLang}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 py-2">
           {/* Preview / Code Switch */}
-          <div className="flex items-center bg-[var(--surf)] p-1 rounded-full border border-[var(--bd)] text-xs">
+          <div className="flex items-center bg-[var(--surf)] p-1 rounded-full text-xs">
             <button
               type="button"
               onClick={() => setActiveTab('preview')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'preview'
                   ? 'bg-[var(--ac)] text-[var(--on)] shadow-xs'
                   : 'text-[var(--mut)] hover:text-[var(--tx)]'
@@ -173,7 +171,7 @@ export function CodePreviewPanel({
             <button
               type="button"
               onClick={() => setActiveTab('code')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'code'
                   ? 'bg-[var(--ac)] text-[var(--on)] shadow-xs'
                   : 'text-[var(--mut)] hover:text-[var(--tx)]'
@@ -219,7 +217,8 @@ export function CodePreviewPanel({
             type="button"
             onClick={() => setRunCounter((n) => n + 1)}
             title={cp.rerunTitle}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-[var(--bd)] hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
+            aria-label={cp.rerunTitle}
+            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
           >
             <RotateCw className="w-4 h-4" />
           </button>
@@ -229,7 +228,8 @@ export function CodePreviewPanel({
             type="button"
             onClick={handleCopy}
             title={cp.copyCode}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-[var(--bd)] hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
+            aria-label={cp.copyCode}
+            className="hidden sm:flex w-9 h-9 items-center justify-center rounded-xl hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
           >
             {copied ? (
               <Check className="w-4 h-4 text-emerald-500" />
@@ -243,7 +243,8 @@ export function CodePreviewPanel({
             type="button"
             onClick={handleDownload}
             title={cp.downloadTitle}
-            className="hidden sm:flex w-9 h-9 items-center justify-center rounded-xl border border-[var(--bd)] hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
+            aria-label={cp.downloadTitle}
+            className="hidden sm:flex w-9 h-9 items-center justify-center rounded-xl hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
           >
             <Download className="w-4 h-4" />
           </button>
@@ -253,7 +254,8 @@ export function CodePreviewPanel({
             type="button"
             onClick={onToggleExpand}
             title={isExpanded ? cp.restoreTitle : cp.expandTitle}
-            className="hidden lg:flex w-9 h-9 items-center justify-center rounded-xl border border-[var(--bd)] hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
+            aria-label={isExpanded ? cp.restoreTitle : cp.expandTitle}
+            className="hidden lg:flex w-9 h-9 items-center justify-center rounded-xl hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
           >
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -264,9 +266,9 @@ export function CodePreviewPanel({
             onClick={onClose}
             title={cp.closeTitle}
             aria-label={cp.closeTitle}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-[var(--bd)] hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
+            className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer shrink-0"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4.5 h-4.5 sm:w-4 sm:h-4" />
           </button>
         </div>
       </header>
@@ -300,8 +302,8 @@ export function CodePreviewPanel({
         )}
 
         {/* Console Output Drawer */}
-        <div className="border-t border-[var(--bd)] bg-[var(--card)] shrink-0">
-          <div className="flex items-center justify-between px-3 py-2 text-xs">
+        <div className="border-t border-[var(--bd)] bg-[var(--card)] pb-[env(safe-area-inset-bottom)] shrink-0">
+          <div className="flex items-center justify-between px-3.5 py-2.5 sm:py-2 text-xs">
             <button
               type="button"
               onClick={() => setConsoleOpen((o) => !o)}

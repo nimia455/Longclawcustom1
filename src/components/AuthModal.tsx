@@ -288,7 +288,7 @@ export function AuthModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/60 backdrop-blur-xs"
           onClick={onClose}
         >
           <motion.div
@@ -296,15 +296,15 @@ export function AuthModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-[430px] max-h-[92dvh] overflow-y-auto bg-[var(--card)] text-[var(--tx)] border border-[var(--bd)] rounded-3xl sm:rounded-[28px] p-5 sm:p-8 shadow-2xl relative"
+            className="surface-3d-elevated w-full max-w-[430px] max-h-[90dvh] overflow-y-auto text-[var(--tx)] rounded-3xl sm:rounded-[28px] p-5 sm:p-8 relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={onClose}
-              className="absolute top-5 right-5 p-2 rounded-full hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer"
+              className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 w-9 h-9 flex items-center justify-center rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]/80 transition-colors cursor-pointer"
               aria-label={t.common.close}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4.5 h-4.5" />
             </button>
 
             <h3 className="font-serif-fraunces text-2xl font-semibold text-center mb-1">
@@ -341,7 +341,7 @@ export function AuthModal({
                       <p className="text-xs text-[var(--mut)] leading-relaxed">{a.forgotDesc}</p>
 
                       <div className="relative">
-                        <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5 sm:top-3.5" />
+                        <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                           type="email"
                           placeholder={a.emailPlaceholder}
@@ -349,7 +349,7 @@ export function AuthModal({
                           onChange={(e) => setEmail(e.target.value)}
                           autoComplete="email"
                           required
-                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                          className="well-3d w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
                         />
                       </div>
 
@@ -370,7 +370,7 @@ export function AuthModal({
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                        className="btn-3d-primary w-full py-3 rounded-full font-medium text-sm disabled:opacity-50 cursor-pointer"
                       >
                         {loading ? a.sending : a.sendVerificationEmail}
                       </button>
@@ -401,19 +401,19 @@ export function AuthModal({
                       </div>
 
                       <div className="relative">
-                        <KeyRound className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                        <KeyRound className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                           type="text"
                           placeholder={a.codePlaceholder}
                           value={resetCode}
                           onChange={(e) => setResetCode(e.target.value)}
                           required
-                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                          className="well-3d w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
                         />
                       </div>
 
                       <div className="relative">
-                        <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                        <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                           type="password"
                           placeholder={a.newPasswordPlaceholder}
@@ -421,7 +421,7 @@ export function AuthModal({
                           onChange={(e) => setNewPassword(e.target.value)}
                           autoComplete="new-password"
                           required
-                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                          className="well-3d w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
                         />
                       </div>
 
@@ -442,7 +442,7 @@ export function AuthModal({
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                        className="btn-3d-primary w-full py-3 rounded-full font-medium text-sm disabled:opacity-50 cursor-pointer"
                       >
                         {loading ? a.verifying : a.verifyAndUpdatePassword}
                       </button>
@@ -477,7 +477,7 @@ export function AuthModal({
                       type="button"
                       onClick={handleGoogleSignIn}
                       disabled={loading}
-                      className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-full border border-[var(--bd)] bg-[var(--card)] hover:bg-[var(--surf)] text-[var(--tx)] font-medium text-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
+                      className="btn-3d-soft w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-full font-medium text-sm disabled:opacity-50 cursor-pointer"
                     >
                       <GoogleIcon className="w-4 h-4" />
                       <span>{a.continueWithGoogle}</span>
@@ -487,7 +487,7 @@ export function AuthModal({
                       type="button"
                       onClick={handleAppleSignIn}
                       disabled={loading}
-                      className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-full border border-[var(--bd)] bg-[var(--card)] hover:bg-[var(--surf)] text-[var(--tx)] font-medium text-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs"
+                      className="btn-3d-soft w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-full font-medium text-sm disabled:opacity-50 cursor-pointer"
                     >
                       <AppleIcon className="w-4 h-4" />
                       <span>{a.continueWithApple}</span>
@@ -502,18 +502,18 @@ export function AuthModal({
                     </span>
                   </div>
 
-                  {/* Tabs */}
-                  <div className="flex bg-[var(--surf)] rounded-full p-1 mb-4">
+                  {/* Clean Editorial Underline Tabs */}
+                  <div className="flex border-b border-[var(--bd)] mb-4">
                     <button
                       type="button"
                       onClick={() => {
                         setTab('in');
                         resetMessages();
                       }}
-                      className={`flex-1 py-2 text-xs font-medium rounded-full transition-all cursor-pointer ${
+                      className={`flex-1 pb-2.5 text-xs font-medium border-b-2 -mb-[1px] transition-colors cursor-pointer ${
                         tab === 'in'
-                          ? 'bg-[var(--card)] text-[var(--tx)] shadow-xs'
-                          : 'text-[var(--mut)] hover:text-[var(--tx)]'
+                          ? 'border-[var(--tx)] text-[var(--tx)] font-semibold'
+                          : 'border-transparent text-[var(--mut)] hover:text-[var(--tx)]'
                       }`}
                     >
                       {a.tabSignIn}
@@ -524,10 +524,10 @@ export function AuthModal({
                         setTab('up');
                         resetMessages();
                       }}
-                      className={`flex-1 py-2 text-xs font-medium rounded-full transition-all cursor-pointer ${
+                      className={`flex-1 pb-2.5 text-xs font-medium border-b-2 -mb-[1px] transition-colors cursor-pointer ${
                         tab === 'up'
-                          ? 'bg-[var(--card)] text-[var(--tx)] shadow-xs'
-                          : 'text-[var(--mut)] hover:text-[var(--tx)]'
+                          ? 'border-[var(--tx)] text-[var(--tx)] font-semibold'
+                          : 'border-transparent text-[var(--mut)] hover:text-[var(--tx)]'
                       }`}
                     >
                       {a.tabSignUp}
@@ -538,20 +538,20 @@ export function AuthModal({
                   <form onSubmit={handleEmailAuth} className="space-y-3">
                     {tab === 'up' && (
                       <div className="relative">
-                        <UserIcon className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                        <UserIcon className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                           type="text"
                           placeholder={a.namePlaceholder}
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           autoComplete="name"
-                          className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                          className="well-3d w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
                         />
                       </div>
                     )}
 
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                      <Mail className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="email"
                         placeholder={a.emailShortPlaceholder}
@@ -559,12 +559,12 @@ export function AuthModal({
                         onChange={(e) => setEmail(e.target.value)}
                         autoComplete="email"
                         required
-                        className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                        className="well-3d w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
                       />
                     </div>
 
                     <div className="relative">
-                      <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-3.5" />
+                      <Lock className="w-4 h-4 text-[var(--mut)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="password"
                         placeholder={a.passwordPlaceholder}
@@ -572,7 +572,7 @@ export function AuthModal({
                         onChange={(e) => setPassword(e.target.value)}
                         autoComplete={tab === 'up' ? 'new-password' : 'current-password'}
                         required
-                        className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-[var(--bd)] bg-[var(--bg)] text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
+                        className="well-3d w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl text-[var(--tx)] placeholder:text-[var(--mut)] text-base sm:text-sm outline-none focus:border-[var(--tx)] transition-colors"
                       />
                     </div>
 
@@ -639,7 +639,7 @@ export function AuthModal({
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full py-3 rounded-full bg-[var(--ac)] text-[var(--on)] font-medium text-sm hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer shadow-md mt-2"
+                      className="btn-3d-primary w-full py-3 rounded-full font-medium text-sm disabled:opacity-50 cursor-pointer mt-2"
                     >
                       {loading ? a.processing : tab === 'up' ? a.createAccount : a.signInBtn}
                     </button>

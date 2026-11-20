@@ -1,12 +1,11 @@
 {
-  "projectId": "main-pursuit-8sx2c",
-  "appId": "1:724623748903:web:8eac7cd857c5ade1930302",
-  "apiKey": "AIzaSyBKHQQtB80pOFt1R0xXVB_ge3Xy-AUWFCo",
-  "authDomain": "main-pursuit-8sx2c.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-longclaw-472873f5-9c73-4e1a-afc3-73a82917c74e",
-  "storageBucket": "main-pursuit-8sx2c.firebasestorage.app",
-  "messagingSenderId": "724623748903",
+  "projectId": "gen-lang-client-0337295581",
+  "appId": "1:813658745435:web:d942648e1a258ee02a2d7e",
+  "apiKey": "AIzaSyCNmckmiKLH4vr7BkxgiU5X94NlWeIoKKM",
+  "authDomain": "gen-lang-client-0337295581.firebaseapp.com",
+  "storageBucket": "gen-lang-client-0337295581.firebasestorage.app",
+  "messagingSenderId": "813658745435",
   "measurementId": "",
-  "oAuthClientId": "724623748903-btkivilgs875tti73lco6er55ogimi2p.apps.googleusercontent.com",
+  "oAuthClientId": "813658745435-17tuhmvhdctiopv218iebdbp2qcgaggm.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

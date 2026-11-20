@@ -1,5 +1,6 @@
 export type ChatModelId =
   | 'longclaw-clawing-1.2-ultra'
+  | 'longclaw-clawing-1.2-pro'
   | 'longclaw-clawing-1.1-ultra'
   | 'longclaw-clawing-1.1-pro'
   | 'longclaw-clawing-1-pro'
@@ -15,55 +16,63 @@ export interface ChatModelOption {
   inFamily: boolean;
 }
 
-export const DEFAULT_CHAT_MODEL: ChatModelId = 'longclaw-clawing-1.1-pro';
+export const DEFAULT_CHAT_MODEL: ChatModelId = 'longclaw-clawing-1.2-pro';
 
 export const CHAT_MODELS: ChatModelOption[] = [
   {
     id: 'longclaw-clawing-1.2-ultra',
     name: 'Longclaw Clawing 1.2 Ultra',
     shortName: 'Clawing 1.2 Ultra',
-    tagline: 'MMLU-Pro Uzmanı',
-    description: 'MMLU-Pro ve doktora düzeyi çok adımlı akıl yürütme için geliştirilen amiral gemisi canavar model.',
+    tagline: 'En kapsamlı',
+    description: 'Uzun metinler, teknik incelemeler ve çok adımlı kararlar için en derin model.',
+    inFamily: true,
+  },
+  {
+    id: 'longclaw-clawing-1.2-pro',
+    name: 'Longclaw Clawing 1.2 Pro',
+    shortName: 'Clawing 1.2 Pro',
+    tagline: 'Günlük denge',
+    description: 'Kod, yazı ve günlük işlerde hız ile doğruluğu dengede tutan ana çalışma modeli.',
     inFamily: true,
   },
   {
     id: 'longclaw-clawing-1.1-ultra',
     name: 'Longclaw Clawing 1.1 Ultra',
     shortName: 'Clawing 1.1 Ultra',
-    tagline: 'Ultra',
-    description: 'En zorlu mimari tasarım, uzun araştırma ve çok adımlı akıl yürütme için üst seviye.',
+    tagline: 'Derin analiz',
+    description: 'Mimari tasarım, uzun araştırma notları ve aşamalı akıl yürütme için sakin ve titiz model.',
     inFamily: true,
   },
   {
     id: 'longclaw-clawing-1.1-pro',
     name: 'Longclaw Clawing 1.1 Pro',
     shortName: 'Clawing 1.1 Pro',
-    tagline: 'Yeni · Gelişmiş',
-    description: 'Clawing 1.1 temelinin Pro yükseltmesi; daha keskin kodlama, güçlü bağlam takibi ve hızlı Pro yanıtlar.',
-    inFamily: true,
+    tagline: 'Önceki Pro',
+    description: 'Clawing 1.1 tabanlı Pro sürümü; düzenli kod çıktısı ve uzun konuşmalarda tutarlı takip.',
+    inFamily: false,
   },
   {
     id: 'longclaw-clawing-1-pro',
     name: 'Longclaw Clawing 1 Pro',
     shortName: 'Clawing 1 Pro',
-    tagline: 'Önceki Pro',
-    description: 'Karmaşık problemler, kodlama ve derin akıl yürütme için önceki nesil Pro modeli.',
+    tagline: 'Klasik Pro',
+    description: 'İlk nesil Pro sürümü; alıştığı tonda devam etmek isteyenler için.',
     inFamily: false,
   },
   {
     id: 'longclaw-clawing-1.1-low',
     name: 'Longclaw Clawing 1.1 Low',
     shortName: 'Clawing 1.1 Low',
-    tagline: 'Yeni · Ultra Hızlı',
-    description: '1 Low’un geliştirilmiş 1.1 sürümü; daha keskin Türkçe, temiz biçimlendirme ve sıfır gecikmeye yakın yanıtlar.',
+    tagline: 'Hızlı yanıt',
+    description: 'Kısa sorular, hızlı çeviriler ve taslak düzeltmeleri için bekletmeden yanıt verir.',
     inFamily: true,
   },
   {
     id: 'longclaw-clawing-1.1',
     name: 'Longclaw Clawing 1.1',
     shortName: 'Clawing 1.1',
-    tagline: 'Yeni · Standart',
-    description: '1.1 nesli standart model; daha doğal Türkçe, düzenli anlatım ve akıcı günlük sohbetler için.',
+    tagline: 'Standart',
+    description: 'Doğal Türkçe, sade anlatım ve rahat günlük sohbetler için standart sürüm.',
     inFamily: false,
   },
 ];

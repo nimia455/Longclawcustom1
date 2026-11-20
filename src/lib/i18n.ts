@@ -43,6 +43,21 @@ export interface Translations {
     familyTitle: string;
     familySubtitle: string;
     compareBenchmarks: string;
+    showcaseEyebrow: string;
+    showcaseTitle: string;
+    showcaseCards: {
+      reasoningKicker: string;
+      reasoningTitle: string;
+      reasoningDesc: string;
+      reasoningAlt: string;
+      codingKicker: string;
+      codingTitle: string;
+      codingDesc: string;
+      codingAlt: string;
+    };
+    heroImageAlt: string;
+    depthsImageAlt: string;
+    heroThinkingBadge: string;
     timelineTitle: string;
     timelineItems: {
       time: string;
@@ -191,6 +206,38 @@ export interface Translations {
   };
   chat: {
     suggestions: string[];
+    emptyWorkspace: {
+      greetingMorning: (name: string) => string;
+      greetingAfternoon: (name: string) => string;
+      greetingEvening: (name: string) => string;
+      subtitle: string;
+      tabs: {
+        everyday: string;
+        write: string;
+        code: string;
+        gmail: string;
+      };
+      starters: {
+        everyday: Array<{ title: string; subtitle: string; prompt: string }>;
+        write: Array<{ title: string; subtitle: string; prompt: string }>;
+        code: Array<{ title: string; subtitle: string; prompt: string }>;
+        gmail: Array<{ title: string; subtitle: string; prompt: string }>;
+      };
+      gmailPromptConnectTitle: string;
+      gmailPromptConnectDesc: string;
+      gmailConnectAction: string;
+      gmailBrowseAction: string;
+      gmailConnectedLabel: string;
+      gmailDisconnectedLabel: string;
+      quickActionsTitle: string;
+      uploadFileTitle: string;
+      uploadFileDesc: string;
+      connectorsCardTitle: string;
+      connectorsCardDescConnected: string;
+      connectorsCardDescDisconnected: string;
+      recentChatsTitle: string;
+      messagesCount: (count: number) => string;
+    };
     backToLandingTitle: string;
     closeMenuAria: string;
     newChatTitle: string;
@@ -274,6 +321,57 @@ export interface Translations {
       clearConsole: string;
       noConsoleOutput: string;
     };
+    connectors: {
+      title: string;
+      subtitle: string;
+      openButtonTitle: string;
+      gmailName: string;
+      gmailDesc: string;
+      connectedAs: (email: string) => string;
+      notConnected: string;
+      signInWithGoogle: string;
+      connecting: string;
+      disconnect: string;
+      useInChatLabel: string;
+      useInChatHint: string;
+      inboxTab: string;
+      composeTab: string;
+      searchPlaceholder: string;
+      searchButton: string;
+      refreshTitle: string;
+      loadingInbox: string;
+      emptyInbox: string;
+      unreadLabel: string;
+      attachToChat: string;
+      replyButton: string;
+      toLabel: string;
+      toPlaceholder: string;
+      subjectLabel: string;
+      subjectPlaceholder: string;
+      bodyLabel: string;
+      bodyPlaceholder: string;
+      saveDraftButton: string;
+      sendEmailButton: string;
+      confirmSendTitle: string;
+      confirmDraftTitle: string;
+      confirmSendDesc: string;
+      confirmDraftDesc: string;
+      confirmSendButton: string;
+      confirmDraftButton: string;
+      cancelButton: string;
+      sending: string;
+      savingDraft: string;
+      sentSuccess: string;
+      draftSavedSuccess: string;
+      missingFieldsError: string;
+      sessionExpired: string;
+      connectFailed: string;
+      draftCardTitle: string;
+      reviewAndSaveDraft: string;
+      reviewAndSend: string;
+      connectToSendHint: string;
+      readingGmailStatus: string;
+    };
   };
 }
 
@@ -291,197 +389,203 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     },
     models: {
       'longclaw-clawing-1.2-ultra': {
-        tagline: 'MMLU-Pro Uzmanı',
-        description:
-          'MMLU-Pro ve doktora düzeyi çok adımlı akıl yürütme için geliştirilen amiral gemisi canavar model.',
+        tagline: 'Derin Analiz',
+        description: 'Zor problemler, araştırma ve çok adımlı mantık için en güçlü model.',
+      },
+      'longclaw-clawing-1.2-pro': {
+        tagline: 'Günlük',
+        description: 'Kod, yazı ve günlük işler için hızlı ve dengeli.',
       },
       'longclaw-clawing-1.1-ultra': {
         tagline: 'Ultra',
-        description:
-          'En zorlu mimari tasarım, uzun araştırma ve çok adımlı akıl yürütme için üst seviye.',
+        description: 'Uzun metinler ve detaylı karşılaştırmalar için.',
       },
       'longclaw-clawing-1.1-pro': {
-        tagline: 'Yeni · Gelişmiş',
-        description:
-          'Clawing 1.1 temelinin Pro yükseltmesi; daha keskin kodlama, güçlü bağlam takibi ve hızlı Pro yanıtlar.',
+        tagline: 'Pro',
+        description: 'Uzun bağlamda tutarlı, kod ve yazıda net.',
       },
       'longclaw-clawing-1-pro': {
-        tagline: 'Önceki Pro',
-        description:
-          'Karmaşık problemler, kodlama ve derin akıl yürütme için önceki nesil Pro modeli.',
+        tagline: 'Klasik Pro',
+        description: 'Sade üsluplu, düzenli teknik ve yazı işleri için.',
       },
       'longclaw-clawing-1.1-low': {
-        tagline: 'Yeni · Ultra Hızlı',
-        description:
-          '1 Low’un geliştirilmiş 1.1 sürümü; daha keskin Türkçe, temiz biçimlendirme ve sıfır gecikmeye yakın yanıtlar.',
+        tagline: 'Anlık',
+        description: 'Kısa sorular, çeviri ve anında yanıtlar için en hızlı seçenek.',
       },
       'longclaw-clawing-1.1': {
-        tagline: 'Yeni · Standart',
-        description:
-          '1.1 nesli standart model; daha doğal Türkçe, düzenli anlatım ve akıcı günlük sohbetler için.',
+        tagline: 'Standart',
+        description: 'Doğal sohbet ve sade açıklamalar için.',
       },
     },
     nav: {
-      whatItDoes: 'Neler yapar',
+      whatItDoes: 'Komutlar',
       depths: 'Derinlikler',
-      benchmarks: 'Benchmark',
-      faq: 'Sorular',
+      benchmarks: 'Ölçümler',
+      faq: 'SSS',
       toggleTheme: 'Temayı değiştir',
       signIn: 'Giriş yap',
       start: 'Başla',
       chooseLanguage: 'Dil seçin',
     },
     landing: {
-      poweredBy: 'LongClaw Clawing ile güçlendirilmiş',
-      heroTitleLine1: 'Aklındakini yaz,',
-      heroTitleLine2: 'Longclaw toparlasın.',
-      heroSubtitle:
-        'E-posta yazarken, uzun bir metni okumaya üşenirken ya da bir konuyu üçüncü kez anlamaya çalışırken yanında duran sessiz arkadaş.',
+      poweredBy: 'Longclaw AI',
+      heroTitleLine1: 'Daha hızlı düşün.',
+      heroTitleLine2: 'Her şeyi üret.',
+      heroSubtitle: 'Sohbet, kod, görsel ve Google araçların tek bir yerde.',
       startFree: 'Ücretsiz başla',
-      benchmarksCta: 'Benchmarklar',
+      benchmarksCta: 'Ölçümler',
       demoConversations: [
         {
-          q: 'Toplantıyı ertelemek için kısa bir mesaj yaz.',
-          a: 'Merhaba, yarınki toplantıyı perşembeye alabilir miyiz? Önüme beklenmedik acil bir iş çıktı.',
+          q: 'Son üç e-postamdaki önemli noktaları özetle',
+          a: '1. Tasarım toplantısı Perşembe 14:00’e alındı. 2. Bütçe onaylandı. 3. Ana sayfa metni için onayın bekleniyor.',
         },
         {
-          q: '“Görüşmek üzere” İngilizcede nasıl denir?',
-          a: 'Resmi yazışmada “Looking forward to speaking with you”, samimi ortamda “See you soon” iyi çalışır.',
+          q: 'Burada deneyebileceğim sade bir kronometre yaz',
+          a: 'Canlı önizleme panelinde hazır — sohbetin hemen yanında başlatıp test edebilirsin.',
         },
         {
-          q: 'Bunu daha samimi yap: Talebiniz değerlendirilmiştir.',
-          a: 'Mesajını aldım, hemen bir bakıp sana dönüyorum!',
+          q: '/takvim Yarın 10:00’a ekip toplantısı ekle',
+          a: '"Ekip Toplantısı" yarın 10:00–11:00 için takvimine eklendi.',
         },
       ],
-      sidebarMockTitle: 'Günlük Notlar',
-      familyEyebrow: 'LongClaw Clawing Ailesi',
-      familyTitle: 'Her ihtiyaca uygun dört ayrı model.',
-      familySubtitle:
-        'Sohbet çubuğundan dilediğin an 1.2 Ultra, Ultra, Pro veya hızlı moda geç.',
-      compareBenchmarks: 'Diğer modellerle kıyasla (Benchmark)',
-      timelineTitle: 'Bir günde Longclaw’a ne sorulur?',
+      sidebarMockTitle: 'Çalışma Alanı',
+      familyEyebrow: 'Modeller',
+      familyTitle: 'Hızını seç.',
+      familySubtitle: 'Sohbet içinden istediğin an model değiştir.',
+      compareBenchmarks: 'Tüm test sonuçlarını gör',
+      showcaseEyebrow: 'Çalışma Alanı',
+      showcaseTitle: 'Sade ve hızlı araçlar.',
+      showcaseCards: {
+        reasoningKicker: '01 · Akıl Yürütme',
+        reasoningTitle: 'Nasıl düşündüğünü gör.',
+        reasoningDesc: 'Karmaşık sorularda adım adım düşünce akışını tek tıkla aç.',
+        reasoningAlt: 'Minimalist çalışma ortamı ve notlar',
+        codingKicker: '02 · Canlı Önizleme',
+        codingTitle: 'Kodu anında çalıştır.',
+        codingDesc: 'HTML, arayüz ve görselleri sohbetin hemen yanında test et.',
+        codingAlt: 'Canlı kod geliştirme görünümü',
+      },
+      heroImageAlt: 'Sabah ışığında sakin okyanus dalgaları ve geniş kumsal sahili',
+      depthsImageAlt: 'Üç farklı derinlik düzeyini simgeleyen minimalist optik cam prizmalar',
+      heroThinkingBadge: 'Longclaw',
+      timelineTitle: '/ yaz, doğrudan yap.',
       timelineItems: [
         {
-          time: '09:12',
-          title: 'Kısa bir e-posta',
-          prompt: '“Müşteriye teşekkür eden iki cümlelik bir mail yaz.”',
-          answer:
-            '“Merhaba, desteğiniz ve güveniniz için içtenlikle teşekkür ederiz. Bir sonraki adımı sizinle planlamaktan memnuniyet duyarız.”',
+          time: '/gmail',
+          title: 'E-posta gönder',
+          prompt: '/gmail Proje özetini Maya’ya gönder',
+          answer: 'Gmail hesabından gönderildi.',
         },
         {
-          time: '11:40',
-          title: 'Toplantı notları',
-          prompt: '“Bu dağınık notları üç maddeye indir.”',
-          answer:
-            '• Bütçe revizyonu onaylandı\n• Lansman tarihi 14 Kasım olarak belirlendi\n• Arayüz tasarımları cuma günü teslim edilecek',
+          time: '/takvim',
+          title: 'Etkinlik ekle',
+          prompt: '/takvim Cuma 13:00’te öğle yemeği ekle',
+          answer: 'Google Takvim’e eklendi.',
         },
         {
-          time: '14:05',
-          title: 'İngilizce bir cümle',
-          prompt: '“Bunu daha resmi ve nazik nasıl söylerim?”',
-          answer: '“Would you mind sharing the updated project report by Friday afternoon?”',
+          time: '/drive',
+          title: 'Dosya bul',
+          prompt: '/drive Q4 sunumunu bul',
+          answer: 'Google Drive dosyan bulundu ve getirildi.',
         },
         {
-          time: '17:30',
-          title: 'Yarının planı',
-          prompt: '“Yarın için öncelikli yapılacaklar listesi hazırla.”',
-          answer:
-            '1. Çeyrek raporunu tamamla\n2. Faturaları muhasebeye ilet\n3. Diş hekimi randevusunu takvime işle',
+          time: '/döküman',
+          title: 'Doküman oluştur',
+          prompt: '/döküman Yayın kontrol listesi hazırla',
+          answer: 'Yeni Google Dokümanı oluşturuldu.',
         },
         {
-          time: '22:10',
-          title: 'Ders çalışırken',
-          prompt: '“Osmoz ile difüzyon arasındaki temel fark ne?”',
-          answer:
-            'Osmoz sadece su moleküllerinin yarı geçirgen bir zardan geçişidir. Difüzyon ise genel olarak herhangi bir maddenin yüksek yoğunluklu ortamdan düşük yoğunluklu ortama kendiliğinden yayılmasıdır.',
+          time: '/görev',
+          title: 'Görev kaydet',
+          prompt: '/görev Pazartesiden önce alan adını yenile',
+          answer: 'Google Görevler’e eklendi.',
         },
       ],
-      depthsTitle: 'Aynı soru, üç derinlik.',
-      depthsSubtitle:
-        'Aynı model; Hızlı, Orta ve Derin düşünme eforlarıyla nasıl yanıt verir? İncele.',
-      depthPrompt: '“Neden gökyüzü mavi?”',
+      depthsTitle: 'Kısa yanıt ya da tam analiz.',
+      depthsSubtitle: 'Her soru için Hızlı, Orta veya Derin seç.',
+      depthPrompt: 'Yeni bir yazılım ürününü nasıl fiyatlandırmalıyım?',
       depthAnswers: [
         {
           title: 'Hızlı',
-          desc: 'Acelen varsa ve soru basitse.',
+          desc: 'Tek satır, net cevap.',
           width: '30%',
-          text: 'Güneş ışığındaki mavi, atmosferdeki gaz moleküllerinde en çok saçılan renk olduğu için.',
+          text: 'Sunucu maliyetine göre değil, kullanıcıya kazandırdığın zamana ve değere göre 2–3 sade paket oluştur.',
         },
         {
           title: 'Orta',
-          desc: 'Günlük işlerin ve genel açıklamaların çoğu için.',
+          desc: 'Dengeli özet ve öneri.',
           width: '65%',
-          text: 'Güneş ışığı beyaz görünür ama aslında tüm renkleri barındırır. Atmosferdeki gaz molekülleri kısa dalga boylu mavi ışığı diğer renklere göre çok daha fazla saçar.\n\nBu saçılan mavi her yönden gözümüze ulaştığı için gökyüzünü mavi görürüz.',
+          text: 'Maliyete göre fiyat koyma. Ürününün her ay ne kadar zaman veya para tasarrufu sağladığına bak ve bunun %10–20’sini hedefle.\n\nDeneme için ücretsiz bir paket, net bir Pro plan ve ekipler için ayrı bir plan yeterli.',
         },
         {
           title: 'Derin',
-          desc: 'Karmaşık konular, karşılaştırmalar, neden-sonuç zinciri.',
+          desc: 'Adım adım tam plan.',
           width: '100%',
-          text: 'Bu olaya Rayleigh saçılması denir. Saçılma şiddeti ışığın dalga boyunun dördüncü kuvvetiyle ters orantılıdır; yani yaklaşık 450 nm dalga boyundaki mavi ışık, kırmızıya oranla atmosfere girdiğinde 6 kata yakın daha fazla saçılır.\n\nPeki neden mor değil? Çünkü Güneş spektrumu moru mavi kadar yoğun yaymaz ve insan gözündeki reseptörler maviye çok daha duyarlıdır.',
+          text: '1. Değer ölçütü: Fiyatı müşterinin başarısıyla büyüyen bir birime bağla (kullanıcı sayısı, proje veya kullanım).\n2. Paket yapısı: Keşif için Ücretsiz, bireysel işler için Pro, ortak çalışma için Ekip paketi.\n3. Erken test: Yıllık ödemede %20 indirim sun; dönüşüm %5’in üzerinde kaldıkça yeni kullanıcılar için fiyatı kademeli artır.',
         },
       ],
-      checklistTitle: 'Küçük şeyler',
+      checklistTitle: 'Neler var?',
       checklistItems: [
-        'Google, Apple ve E-posta doğrulamalı güvenli giriş',
-        'Firebase Firestore ile tüm cihazlarda bulut eşitleme',
-        'Tek model üzerinde Hızlı / Orta / Derin düşünme eforu',
-        'Görünür yapay zekâ düşünce adımları ve canlı kod sonucu önizleme',
-        'Hızlı klavye kısayolları: Yeni sohbet (Ctrl/⌘ + K) ve Kenar çubuğu (Ctrl/⌘ + B)',
-        'Önemli konuşmaları üste sabitleme',
-        'Kod ve metin dosyası ekleme (.txt, .md, .py)',
-        'Yanıtı tek tıkla kopyalama & Markdown dışa aktarma',
-        'Açık ve koyu tema desteği',
+        'Google, Apple ve e-posta ile giriş',
+        'Masaüstü ve mobilde otomatik eşitleme',
+        '/gmail, /takvim, /drive, /döküman ve /görev komutları',
+        'Ayarlar’dan özel /komut ekleme',
+        'Hızlı, Orta ve Derin düşünme modları',
+        'Canlı kod önizleme paneli',
+        'Görsel yükleme ve yeni görsel üretme',
+        'Sohbet sabitleme ve hızlı arama',
+        'Sade siyah-beyaz açık ve koyu temalar',
       ],
-      mockSearchPlaceholder: 'özet...',
-      mockPinnedTitle: 'Toplantı özeti (Sabitlenmiş)',
-      mockNote1: 'Özet çıkarma yöntemleri',
-      mockNote2: 'Haftalık plan',
-      mockNote3: 'İngilizce e-posta taslağı',
-      faqTitle: 'Merak edilenler',
+      mockSearchPlaceholder: 'sohbetlerde ara...',
+      mockPinnedTitle: 'Ürün yol haritası',
+      mockNote1: 'API mimarisi',
+      mockNote2: 'Sprint planı',
+      mockNote3: 'Yayın listesi',
+      faqTitle: 'Sorular',
       faqs: [
         {
-          q: 'Ücretli mi?',
-          a: 'Longclaw’ı denemek tamamen ücretsizdir. Firebase ve Google Gemini altyapısıyla çalışır.',
+          q: 'Ücretsiz mi?',
+          a: 'Evet. Hesap açıp hemen kullanmaya başlayabilirsin.',
         },
         {
-          q: 'Yazdıklarım nerede saklanıyor?',
-          a: 'Oturum açtığında tüm sohbetlerin Firebase Firestore üzerinde güvenle şifrelenerek hesabına kaydedilir. Dilediğin an tüm verilerini silebilirsin.',
+          q: 'Google komutları nasıl çalışır?',
+          a: 'Bağlayıcılar’dan Google hesabını bağla, sonra sohbette /gmail, /takvim, /drive, /döküman veya /görev yaz.',
         },
         {
-          q: 'Google ve Apple ile nasıl giriş yapabilirim?',
-          a: 'Giriş ekranında yer alan Google veya Apple düğmesine basarak şifre girmeden tek tıkla hesabına bağlanabilirsin.',
+          q: 'Kendi komutumu ekleyebilir miyim?',
+          a: 'Evet. Ayarlar’dan kendi /komut kısayollarını tanımlayıp kaydedebilirsin.',
         },
         {
-          q: 'Hangi dillerde çalışır?',
-          a: 'Arayüzü Türkçe veya İngilizce kullanabilir, sohbette ise hangi dilde yazarsan o dilde doğal ve akıcı yanıt alırsın.',
+          q: 'Sohbetlerimi silebilir miyim?',
+          a: 'İstediğin sohbeti tek tıkla ya da hesabınla birlikte tamamen silebilirsin.',
         },
       ],
-      getStartedNow: 'Hemen Başla',
-      footerTagline: 'Yaz, özetle, çevir, düşün. Hepsi tek bir sohbette.',
-      footerNavHeading: 'Gezinme',
-      footerBackToTop: 'Başa dön',
-      footerLegalHeading: 'Yasal & Güvenlik',
+      getStartedNow: 'Hemen başla',
+      footerTagline: 'Sohbet, kod, görsel ve komutlar tek bir yerde.',
+      footerNavHeading: 'Sayfalar',
+      footerBackToTop: 'Yukarı çık',
+      footerLegalHeading: 'Yasal',
       footerPrivacy: 'Gizlilik Politikası',
       footerTerms: 'Kullanım Şartları',
       footerKvkk: 'KVKK Aydınlatma Metni',
-      footerCopyright: 'Longclaw © 2026. Tüm hakları saklıdır.',
+      footerCopyright: 'Longclaw © 2026',
     },
     benchmarks: {
       backToHome: 'Ana sayfaya dön',
-      eyebrow: 'Değerlendirme ve Kıyaslama · Kasım 2026',
-      title: 'Diğer modellerle gerçekçi kıyaslama.',
+      eyebrow: 'Ölçüm Notları · Kasım 2026',
+      title: 'Sayılarla gerçekçi bir kıyaslama.',
       subtitle:
-        'MMLU-Pro için özel geliştirilen yeni Longclaw Clawing 1.2 Ultra ve tüm LongClaw ailesini Türkçe dil nüansı, akademik bilgi, kodlama, matematik ve yanıt hızı testlerinde rakip modellerle karşılaştırdık.',
-      testYourself: 'Kendin test et',
+        'Longclaw modellerini Türkçe dil hakimiyeti, genel bilgi, kodlama, matematik ve akış hızı testlerinde yaygın modellerle aynı koşullarda ölçtük.',
+      testYourself: 'Kendin dene',
       takeaways: {
         ultra12:
-          'MMLU-Pro (84.6%) ve GPQA Diamond (71.4%) lideri; doktora seviyesi çok adımlı akıl yürütme canavarı.',
+          'MMLU-Pro (%84.6) ve GPQA Diamond (%71.4) testlerinde öne çıkıyor; uzun ve çok adımlı sorularda en yüksek tutarlılık.',
         ultra11:
-          'Türkçe nüans (86.8%) ve talimat uyumunda güçlü; 1.2 Ultra öncesi mimari ve araştırma standardı.',
+          'Türkçe anlatım (%86.8) ve kurallara sadık kalmada oldukça dengeli; uzun araştırma notları için güvenilir.',
         pro11:
-          'Clawing 1.1’in Pro yükseltmesi: 61.2% LiveCodeBench ve 88 tok/s hızıyla dengeli günlük Pro.',
+          '%61.2 LiveCodeBench ve 88 tok/s hızıyla günlük kodlama ve yazı işlerinde bekletmeyen Pro seçeneği.',
         low11:
-          '1 Low’un 1.1 yükseltmesi: 184 tok/s hız ve 79.8% Türkçe skoruyla hem anlık hem isabetli.',
+          '184 tok/s akış hızı ve %79.8 Türkçe doğruluğuyla küçük ve acil işler için en çevik model.',
       },
       tabs: {
         all: 'Tümü',
@@ -553,79 +657,79 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       startChatting: 'Sohbete başla',
     },
     auth: {
-      titleForgot: 'Şifre Sıfırlama & Doğrulama',
+      titleForgot: 'Şifre Yenileme',
       titleDefault: 'Longclaw’a Hoş Geldin',
-      subtitle: 'Google Firebase & Gemini destekli akıllı asistan',
+      subtitle: 'Kaldığın yerden devam et veya yeni bir hesap aç',
       backToSignIn: 'Giriş ekranına dön',
       forgotDesc:
-        'Hesabınıza kayıtlı e-posta adresinizi girin. Kimliğinizi doğrulamanız için size bir doğrulama ve şifre sıfırlama bağlantısı göndereceğiz.',
-      emailPlaceholder: 'E-posta adresiniz',
+        'Hesabında kullandığın e-posta adresini yaz. Şifreni güvenle yenileyebilmen için bir doğrulama bağlantısı göndereceğiz.',
+      emailPlaceholder: 'E-posta adresin',
       sending: 'Gönderiliyor...',
-      sendVerificationEmail: 'Doğrulama E-postası Gönder',
-      haveCodePrompt: 'Zaten doğrulama kodun var mı? Kodu gir',
-      verificationStepTitle: 'E-posta Doğrulama Adımı',
+      sendVerificationEmail: 'Sıfırlama Bağlantısı Gönder',
+      haveCodePrompt: 'Doğrulama kodun elinde mi? Buradan gir',
+      verificationStepTitle: 'E-posta Doğrulama',
       verificationStepVerified: (email) =>
-        `${email} adresi doğrulandı. Yeni şifrenizi belirleyin.`,
+        `${email} doğrulandı. Şimdi yeni şifreni belirleyebilirsin.`,
       verificationStepDefault:
-        'E-postanızdaki sıfırlama bağlantısına doğrudan tıklayabilir veya bağlantıdaki doğrulama kodunu aşağıya yapıştırarak şifrenizi yenileyebilirsiniz.',
-      codePlaceholder: 'E-postadaki doğrulama kodu veya bağlantısı',
+        'Gelen kutundaki bağlantıya tıklayabilir ya da bağlantıdaki kodu aşağıya yapıştırıp şifreni yenileyebilirsin.',
+      codePlaceholder: 'Doğrulama kodu veya bağlantısı',
       newPasswordPlaceholder: 'Yeni şifre (en az 6 karakter)',
-      verifying: 'Doğrulanıyor...',
-      verifyAndUpdatePassword: 'E-postayı Doğrula ve Şifreyi Güncelle',
-      resendVerificationEmail: 'Doğrulama e-postasını tekrar gönder',
-      continueWithGoogle: 'Google ile Devam Et',
-      continueWithApple: 'Apple ile Giriş Yap',
+      verifying: 'Kontrol ediliyor...',
+      verifyAndUpdatePassword: 'Şifreyi Güncelle',
+      resendVerificationEmail: 'Bağlantıyı tekrar gönder',
+      continueWithGoogle: 'Google ile devam et',
+      continueWithApple: 'Apple ile giriş yap',
       orWithEmail: 'veya e-posta ile',
       tabSignIn: 'Giriş yap',
       tabSignUp: 'Kayıt ol',
       namePlaceholder: 'Adın',
       emailShortPlaceholder: 'E-posta',
       passwordPlaceholder: 'Şifre (en az 6 karakter)',
-      forgotPasswordLink: 'Şifremi unuttum (E-posta ile doğrula)',
+      forgotPasswordLink: 'Şifremi unuttum',
       tosPrefix: '',
       tosTerms: 'Kullanım Şartları',
       tosAnd: '’nı ve ',
       tosPrivacy: 'Gizlilik Politikası',
       tosSuffix: '’nı okudum, kabul ediyorum.',
-      processing: 'İşleniyor...',
+      processing: 'Bekleniyor...',
       createAccount: 'Hesap oluştur',
       signInBtn: 'Giriş yap',
-      footerSecurity: 'Verileriniz Firebase Firestore üzerinde şifrelenir ve korunur.',
+      footerSecurity: 'Sohbetlerin hesabın altında güvenle saklanır.',
       errors: {
         popupClosed: 'Giriş penceresi kapatıldı.',
         accountExistsDifferentCred:
-          'Bu e-posta adresiyle başka bir oturum sağlayıcısı ilişkilendirilmiş.',
-        googleGeneric: 'Google ile giriş yapılırken bir sorun oluştu.',
+          'Bu e-posta adresi başka bir giriş yöntemiyle kayıtlı görünüyor.',
+        googleGeneric: 'Google ile giriş tamamlanamadı, tekrar dener misin?',
         applePopupClosed: 'Apple giriş penceresi kapatıldı.',
-        appleNotAllowed: 'Apple ile giriş Firebase konsolunda etkinleştirilmemiş.',
-        appleGeneric: 'Apple ile giriş yapılırken bir hata oluştu.',
-        invalidEmail: 'Lütfen geçerli bir e-posta adresi girin.',
-        shortPassword: 'Şifre en az 6 karakter olmalıdır.',
+        appleNotAllowed: 'Apple ile giriş şu an etkin değil.',
+        appleGeneric: 'Apple ile giriş sırasında bir sorun oluştu.',
+        invalidEmail: 'Geçerli bir e-posta adresi yazar mısın?',
+        shortPassword: 'Şifre en az 6 karakter olmalı.',
         acceptTos:
-          'Devam etmek için Kullanım Şartları ve Gizlilik Politikasını kabul etmelisiniz.',
+          'Devam etmeden önce Kullanım Şartları ve Gizlilik Politikasını onaylaman gerekiyor.',
         accountCreatedInfo:
-          'Hesabınız oluşturuldu ve e-posta adresinize doğrulama bağlantısı gönderildi.',
-        emailInUse: 'Bu e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.',
-        invalidCredential: 'E-posta veya şifre hatalı.',
-        userNotFound: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.',
+          'Hesabın hazır! Gelen kutuna küçük bir doğrulama bağlantısı bıraktık.',
+        emailInUse: 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.',
+        invalidCredential: 'E-posta ya da şifre eşleşmedi.',
+        userNotFound: 'Bu e-posta ile kayıtlı bir hesap bulamadık.',
         operationNotAllowed:
-          'E-posta/şifre girişi Firebase Console > Authentication üzerinden etkinleştirilmelidir.',
-        genericAuth: 'İşlem sırasında bir hata oluştu.',
+          'E-posta ile giriş şu an kapalı görünüyor.',
+        genericAuth: 'Bir şeyler ters gitti, lütfen tekrar dene.',
         invalidEmailReset:
-          'Doğrulama e-postası için lütfen geçerli bir e-posta adresi girin.',
+          'Sıfırlama bağlantısı için geçerli bir e-posta adresi yaz.',
         resetSentInfo: (email) =>
-          `${email} adresine şifre sıfırlama ve e-posta doğrulama bağlantısı gönderildi. Gelen kutunuzdaki bağlantıya tıklayın veya bağlantıdaki doğrulama kodunu aşağıya girin.`,
-        resetUserNotFound: 'Bu e-posta adresine kayıtlı bir kullanıcı bulunamadı.',
-        resetSendFailed: (msg) => `Doğrulama e-postası gönderilemedi: ${msg}`,
+          `${email} adresine sıfırlama bağlantısı gönderdik. Gelen kutuna göz at veya bağlantıdaki kodu aşağıya yapıştır.`,
+        resetUserNotFound: 'Bu e-posta adresiyle kayıtlı bir hesap bulamadık.',
+        resetSendFailed: (msg) => `Bağlantı gönderilemedi: ${msg}`,
         missingResetCode:
-          'Lütfen e-postanızdaki doğrulama kodunu veya bağlantısını yapıştırın.',
-        shortNewPassword: 'Yeni şifreniz en az 6 karakter olmalıdır.',
+          'E-postadaki doğrulama kodunu veya bağlantıyı yapıştırır mısın?',
+        shortNewPassword: 'Yeni şifren en az 6 karakter olmalı.',
         resetSuccessInfo: (email) =>
-          `${email} hesabı doğrulandı ve şifreniz güncellendi! Şimdi yeni şifrenizle giriş yapabilirsiniz.`,
+          `${email} için şifren güncellendi. Artık yeni şifrenle giriş yapabilirsin.`,
         expiredActionCode:
-          'Doğrulama kodunun süresi dolmuş. Lütfen yeni bir doğrulama e-postası isteyin.',
-        invalidActionCode: 'Geçersiz veya daha önce kullanılmış doğrulama kodu.',
-        resetVerifyFailed: 'Şifre sıfırlama doğrulanamadı.',
+          'Bu doğrulama kodunun süresi dolmuş. Yeni bir bağlantı isteyebilirsin.',
+        invalidActionCode: 'Kod geçersiz ya da daha önce kullanılmış.',
+        resetVerifyFailed: 'Şifre yenileme doğrulanamadı.',
       },
     },
     legal: {
@@ -634,42 +738,159 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         gizlilik: {
           title: 'Gizlilik Politikası',
           content: [
-            'Bu politika, Longclaw’ı kullanırken hangi verilerin işlendiğini ve nasıl korunduğunu açıklar. Hizmetimiz, kullanıcılarımızın gizliliğini en yüksek standartlarda korumayı taahhüt eder.',
-            'Hangi verileri topluyoruz? Firebase Authentication aracılığıyla hesap bilgilerin (ad, e-posta adresi, profil fotoğrafı), Firestore üzerinde güvenle şifrelenmiş sohbet kayıtların ve tercihleriniz (tema, derinlik modu).',
-            'Ne için kullanıyoruz? Sohbet geçmişini cihazlarınız arasında güvenle eşitlemek, akıllı Gemini yanıtları üretmek ve oturum güvenliğini sağlamak için.',
-            'Kimlerle paylaşıyoruz? Veritabanı ve kimlik doğrulama için Google Firebase, yapay zekâ yanıtları üretmek için Google Gemini API kullanılır. Verileriniz asla üçüncü taraflara satılmaz veya pazarlama amacıyla paylaşılmaz.',
-            'Saklama ve silme: Sohbet geçmişinizi dilediğiniz zaman tek tek veya profil menüsünden hesabınızı ve tüm verilerinizi tamamen silebilirsiniz.',
+            'Bu metin, Longclaw’ı kullanırken hangi bilgilerin tutulduğunu ve nasıl korunduğunu sade bir dille anlatır.',
+            'Neleri saklıyoruz? Giriş yaptığında adın, e-posta adresin, sohbet geçmişin ve tema/dil gibi kişisel tercihlerin güvenli bulut depolamada tutulur.',
+            'Neden kullanıyoruz? Sohbetlerine telefonundan ve bilgisayarından kesintisiz ulaşabilmen, oturumunu güvende tutmamız ve sorduğun sorulara yanıt üretebilmemiz için.',
+            'Paylaşım: Verilerin hiçbir zaman satılmaz, reklam veya pazarlama amacıyla üçüncü taraflarla paylaşılmaz.',
+            'Silme hakkı: İstediğin sohbeti tek tıkla silebilir veya profil menüsünden hesabını ve tüm kayıtlarını kalıcı olarak kaldırabilirsin.',
           ],
         },
         sartlar: {
           title: 'Kullanım Şartları',
           content: [
-            'Longclaw’a hoş geldiniz. Hizmeti kullanarak bu şartları kabul etmiş olursunuz.',
-            'Hizmet kapsamı: Longclaw; düşünme, yazma, özetleme ve araştırma süreçlerinizde size yardımcı olan bir yapay zekâ asistanıdır.',
-            'Yapay zekâ yanıtları: Yapay zekâ modelleri bazen hatalı veya eksik bilgi üretebilir. Verilen yanıtlar medikal, yasal veya finansal profesyonel tavsiye niteliği taşımaz; kritik kararlarda teyit edilmelidir.',
-            'Kabul edilebilir kullanım: Hizmeti yasa dışı faaliyetler, kötü amaçlı içerik üretimi veya sistem güvenliğini aksatacak müdahaleler için kullanamazsınız.',
-            'Hesap güvenliği: Oturum bilgilerinizi güvende tutmak kullanıcının sorumluluğundadır.',
+            'Longclaw’a hoş geldin. Uygulamayı kullanarak aşağıdaki temel kuralları kabul etmiş olursun.',
+            'Hizmet kapsamı: Longclaw; yazı yazma, not düzenleme, kodlama ve günlük araştırma işlerinde sana eşlik eden dijital bir çalışma alanıdır.',
+            'Yanıtların doğruluğu: Yapay zekâ yanıtları zaman zaman eksik ya da hatalı olabilir. Sağlık, hukuk veya finans gibi kritik konularda uzman görüşü almayı ihmal etme.',
+            'Doğru kullanım: Sistemi kötüye kullanmamak, zararlı içerik üretmemek ve diğer kullanıcıların güvenliğini riske atmamak herkesin sorumluluğudur.',
+            'Hesap güvenliği: Giriş bilgilerini başkalarıyla paylaşmamak ve güvende tutmak hesabın sahibine aittir.',
           ],
         },
         kvkk: {
           title: 'KVKK Aydınlatma Metni',
           content: [
-            '6698 sayılı Kişisel Verilerin Korunması Kanunu uyarınca aydınlatma metnidir.',
-            'İşlenen kişisel veriler: Kimlik bilgisi (Ad, Soyad), iletişim bilgisi (E-posta), kullanıcı işlem kayıtları ve sohbet içerikleri.',
-            'Veri işleme amaçları: Kullanıcı kaydının oluşturulması, yapay zekâ asistan hizmetinin sunulması, veri kaybının önlenmesi ve bilgi güvenliğinin sağlanması.',
-            'Veri aktarımı: Kimlik doğrulama ve veritabanı altyapısı Google Firebase üzerinden, yapay zekâ işleme katmanı Google Gemini API üzerinden sunulmaktadır.',
-            'Haklarınız: KVKK’nın 11. maddesi uyarınca verilerinize erişme, düzeltilmesini talep etme ve silinmesini isteme hakkına sahipsiniz.',
+            '6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında bilgilendirme metnidir.',
+            'İşlenen veriler: Ad, e-posta adresi, oturum bilgileri ve uygulamada oluşturduğun sohbet kayıtları.',
+            'İşleme amacı: Üyelik oluşturma, cihazlar arası sohbet eşitleme, yanıt üretme ve hesap güvenliğini sağlama.',
+            'Saklama: Verilerin yalnızca hizmetin çalışması için gerekli olduğu sürece şifreli bulut altyapısında tutulur.',
+            'Hakların: KVKK madde 11 uyarınca verilerine erişme, düzeltme isteme ve dilediğin an tamamen sildirme hakkına sahipsin.',
           ],
         },
       },
     },
     chat: {
       suggestions: [
-        'Kuantum bilgisayarları basitçe anlat',
-        'Zaman yönetimimi nasıl iyileştirebilirim?',
-        'Müşteriye teşekkür eden samimi ve kısa bir e-posta yaz',
-        'Bu metni üç ana maddede özetle:',
+        'Kuantum bilgisayarları günlük hayattan örnekle anlat',
+        'Dağınık bir haftayı nasıl sakinleştiririm?',
+        'Müşteriye içten ve kısa bir teşekkür maili yaz',
+        'Bu metni üç net maddede özetle:',
       ],
+      emptyWorkspace: {
+        greetingMorning: (name) => `Günaydın, ${name}`,
+        greetingAfternoon: (name) => `İyi günler, ${name}`,
+        greetingEvening: (name) => `İyi akşamlar, ${name}`,
+        subtitle: 'Aklında ne varsa yazabilir, bir dosya bırakabilir ya da aşağıdan bir konu seçebilirsin.',
+        tabs: {
+          everyday: 'Günlük',
+          write: 'Yazı & Not',
+          code: 'Kod',
+          gmail: 'Gmail',
+        },
+        starters: {
+          everyday: [
+            {
+              title: 'Kafa karıştıran bir konuyu sadeleştir',
+              subtitle: 'Teknik jargona boğmadan, gerçek hayat örnekleriyle',
+              prompt: 'Kuantum bilgisayarların mantığını günlük hayattan sade örneklerle anlat',
+            },
+            {
+              title: 'Nefes aldıran bir hafta planla',
+              subtitle: 'Odaklanma saatleri, toplantılar ve mola dengesiyle',
+              prompt: 'Yoğun bir çalışma haftasında tükenmeden ilerlemek için gerçekçi bir haftalık plan kurmama yardım et',
+            },
+            {
+              title: 'İki fikri karşılaştır',
+              subtitle: 'Artıları, eksileri ve net bir öneriyle karar ver',
+              prompt: 'Şu iki seçeneği artıları, eksileri ve gizli riskleriyle karşılaştır:',
+            },
+            {
+              title: 'Hızlı bir öğrenme rotası',
+              subtitle: 'Sıfırdan 14 günlük uygulamalı öğrenme programı',
+              prompt: 'Sıfırdan başlamak isteyen biri için 14 günlük uygulamalı bir öğrenme planı hazırla:',
+            },
+          ],
+          write: [
+            {
+              title: 'Samimi bir müşteri e-postası',
+              subtitle: 'Kısa, profesyonel ve insan sıcaklığında teşekkür notu',
+              prompt: 'Bir müşteriye iş birliği için teşekkür eden samimi, kısa ve doğal bir e-posta yaz',
+            },
+            {
+              title: 'Üç maddelik net özet',
+              subtitle: 'Uzun metni ana fikirlere ve aksiyonlara ayır',
+              prompt: 'Bu metni üç ana maddede özetle ve varsa aksiyon adımlarını çıkar:',
+            },
+            {
+              title: 'Metni daha akıcı hale getir',
+              subtitle: 'Anlamı koruyarak gereksiz tekrarları temizle',
+              prompt: 'Aşağıdaki metni anlamını bozmadan daha net, akıcı ve doğal bir Türkçeyle yeniden yaz:',
+            },
+            {
+              title: 'Toplantı notlarını düzenle',
+              subtitle: 'Kararlar, sorumlular ve sonraki adımlar tablosu',
+              prompt: 'Şu dağınık toplantı notlarını kararlar ve sonraki adımlar halinde düzenle:',
+            },
+          ],
+          code: [
+            {
+              title: 'Canlı önizlemeli mini arayüz',
+              subtitle: 'Tek dosyada çalışan temiz bir Pomodoro zamanlayıcı',
+              prompt: 'Temiz, modern ve minimalist bir Pomodoro zamanlayıcı arayüzünü tek bir HTML dosyasında yaz',
+            },
+            {
+              title: 'Hata ayıkla ve açıkla',
+              subtitle: 'Kök nedeni bulup doğrudan çalışan düzeltmeyi göster',
+              prompt: 'Bu koddaki hatanın kök nedenini bul ve temiz bir çözüm öner:',
+            },
+            {
+              title: 'Veri akışı diyagramı çiz',
+              subtitle: 'Mermaid ile okunaklı mimari şeması oluştur',
+              prompt: 'Modern bir web uygulamasının kimlik doğrulama ve API akışını Mermaid diyagramı olarak çiz',
+            },
+            {
+              title: 'Kodu sadeleştir ve hızlandır',
+              subtitle: 'Okunabilirlik ve performans odaklı refactor önerisi',
+              prompt: 'Bu fonksiyonu daha okunabilir ve performanslı hale getir:',
+            },
+          ],
+          gmail: [
+            {
+              title: 'Okunmamış mailleri özetle',
+              subtitle: 'Önem sırasına göre kısa bir gelen kutusu özeti al',
+              prompt: 'Okunmamış e-postalarımı önem sırasına göre kısaca özetle',
+            },
+            {
+              title: 'Yanıt bekleyenleri bul',
+              subtitle: 'Gözden kaçan önemli mesajları listele',
+              prompt: 'Son gelen e-postalarımdan yanıt vermem gerekenleri listele',
+            },
+            {
+              title: 'Faturaları ve siparişleri tara',
+              subtitle: 'Son fatura, ödeme veya rezervasyon maillerini çıkar',
+              prompt: 'Gelen kutumdaki son fatura, ödeme veya sipariş e-postalarını bulup özetle',
+            },
+            {
+              title: 'Nazik bir yanıt taslağı hazırla',
+              subtitle: 'Onayından sonra Gmail’e kaydet veya gönder',
+              prompt: 'Son gelen önemli e-postama kısa ve nazik bir yanıt taslağı hazırla',
+            },
+          ],
+        },
+        gmailPromptConnectTitle: 'Gmail gelen kutunu sohbete bağla',
+        gmailPromptConnectDesc:
+          'İzninle okunmamış e-postalarını özetle, fatura veya mesaj ara ve onaylayarak taslak oluştur.',
+        gmailConnectAction: 'Gmail’i bağla',
+        gmailBrowseAction: 'Gelen kutusunu aç',
+        gmailConnectedLabel: 'Gmail bağlı',
+        gmailDisconnectedLabel: 'Gmail bağla',
+        quickActionsTitle: 'Hızlı araçlar',
+        uploadFileTitle: 'Dosya ekle',
+        uploadFileDesc: 'Kod, CSV, Markdown veya metin dosyasını doğrudan analiz et',
+        connectorsCardTitle: 'Gmail bağlayıcısı',
+        connectorsCardDescConnected: 'Gelen kutunda ara, e-posta ekle veya yeni mesaj yaz',
+        connectorsCardDescDisconnected: 'E-postalarını özetlemek ve taslak oluşturmak için bağla',
+        recentChatsTitle: 'Kaldığın yerden devam et',
+        messagesCount: (count) => `${count} mesaj`,
+      },
       backToLandingTitle: 'Tanıtım sayfasına dön',
       closeMenuAria: 'Menüyü kapat',
       newChatTitle: 'Yeni sohbet',
@@ -711,14 +932,14 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       helloUser: (name) => `Merhaba, ${name}`,
       defaultFriendName: 'Arkadaşım',
       emptySubtitle: 'Bir soru sor ya da aşağıdaki hazır önerilerden birini dene.',
-      thoughtsLabel: 'Düşünceler',
+      thoughtsLabel: 'Düşünce notları',
       secondsShort: 'sn',
       copied: 'Kopyalandı',
       copy: 'Kopyala',
-      regenerate: 'Yeniden oluştur',
-      thinking: 'Düşünüyor…',
-      inputPlaceholder: 'Longclaw’a bir şey sor...',
-      attachFileTitle: 'Metin / Kod dosyası ekle',
+      regenerate: 'Tekrar dene',
+      thinking: 'Üzerine düşünüyor…',
+      inputPlaceholder: 'Aklındakini yaz veya komutlar için / kullan...',
+      attachFileTitle: 'Görsel veya dosya ekle',
       selectModelTitle: 'Kullanılacak modeli seç',
       modelSelectionAria: 'Model seçimi',
       chooseModel: 'Model seçin',
@@ -755,6 +976,57 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         clearConsole: 'Temizle',
         noConsoleOutput: 'Henüz konsol çıktısı yok.',
       },
+      connectors: {
+        title: 'Bağlayıcılar',
+        subtitle: 'İzninle harici araçlarını bağla; Longclaw gerçek verilerinle çalışsın.',
+        openButtonTitle: 'Bağlayıcılar (Gmail)',
+        gmailName: 'Gmail',
+        gmailDesc: 'Gelen kutunu ara, e-postalarını özetle ve onayınla taslak oluşturup gönder.',
+        connectedAs: (email) => `${email} bağlı`,
+        notConnected: 'Bağlı değil',
+        signInWithGoogle: 'Google ile giriş yap',
+        connecting: 'Bağlanıyor...',
+        disconnect: 'Bağlantıyı kes',
+        useInChatLabel: 'Sohbette Gmail kullan',
+        useInChatHint: 'E-postalarınla ilgili sorular sorduğunda ilgili mesajları otomatik okur.',
+        inboxTab: 'Gelen Kutusu',
+        composeTab: 'Yeni E-posta',
+        searchPlaceholder: 'Gmail’de ara (örn. fatura, is:unread)...',
+        searchButton: 'Ara',
+        refreshTitle: 'Yenile',
+        loadingInbox: 'E-postalar yükleniyor...',
+        emptyInbox: 'Eşleşen e-posta bulunamadı.',
+        unreadLabel: 'Okunmadı',
+        attachToChat: 'Sohbete ekle',
+        replyButton: 'Yanıtla',
+        toLabel: 'Alıcı',
+        toPlaceholder: 'ornek@domain.com',
+        subjectLabel: 'Konu',
+        subjectPlaceholder: 'E-posta konusu',
+        bodyLabel: 'Mesaj',
+        bodyPlaceholder: 'Mesajını buraya yaz...',
+        saveDraftButton: 'Taslak Kaydet',
+        sendEmailButton: 'E-posta Gönder',
+        confirmSendTitle: 'Bu e-posta Gmail ile gönderilsin mi?',
+        confirmDraftTitle: 'Bu taslak Gmail hesabına kaydedilsin mi?',
+        confirmSendDesc: 'Onayladığında aşağıdaki e-posta doğrudan Gmail hesabından gönderilecektir.',
+        confirmDraftDesc: 'Onayladığında aşağıdaki e-posta Gmail Taslaklar klasörüne kaydedilecektir.',
+        confirmSendButton: 'Onayla ve Gönder',
+        confirmDraftButton: 'Onayla ve Kaydet',
+        cancelButton: 'Vazgeç',
+        sending: 'Gönderiliyor...',
+        savingDraft: 'Kaydediliyor...',
+        sentSuccess: 'E-posta Gmail üzerinden gönderildi.',
+        draftSavedSuccess: 'Taslak Gmail hesabına kaydedildi.',
+        missingFieldsError: 'Lütfen alıcı e-posta adresini ve konu veya mesaj alanını doldur.',
+        sessionExpired: 'Gmail oturumunun süresi doldu. Lütfen tekrar bağlan.',
+        connectFailed: 'Gmail bağlantısı tamamlanamadı. Lütfen tekrar dene.',
+        draftCardTitle: 'Gmail Taslak Önerisi',
+        reviewAndSaveDraft: 'Taslak olarak kaydet',
+        reviewAndSend: 'İncele ve gönder',
+        connectToSendHint: 'Göndermek veya taslak kaydetmek için önce Gmail’i bağla.',
+        readingGmailStatus: 'Gmail kontrol ediliyor…',
+      },
     },
   },
   en: {
@@ -770,197 +1042,203 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     },
     models: {
       'longclaw-clawing-1.2-ultra': {
-        tagline: 'MMLU-Pro Specialist',
-        description:
-          'Flagship powerhouse engineered for MMLU-Pro and PhD-level multi-step reasoning.',
+        tagline: 'Deep Reasoning',
+        description: 'Our strongest model for hard problems, research, and complex logic.',
+      },
+      'longclaw-clawing-1.2-pro': {
+        tagline: 'Everyday',
+        description: 'Fast and sharp for coding, writing, and daily work.',
       },
       'longclaw-clawing-1.1-ultra': {
         tagline: 'Ultra',
-        description:
-          'High-capacity model for complex architecture, deep research, and multi-step reasoning.',
+        description: 'Built for long documents and thorough comparisons.',
       },
       'longclaw-clawing-1.1-pro': {
-        tagline: 'New · Enhanced',
-        description:
-          'Pro upgrade of Clawing 1.1; sharper coding, strong context tracking, and fast Pro replies.',
+        tagline: 'Pro',
+        description: 'Reliable context retention for code and drafts.',
       },
       'longclaw-clawing-1-pro': {
-        tagline: 'Previous Pro',
-        description:
-          'Previous-generation Pro model for complex problem-solving, coding, and deep reasoning.',
+        tagline: 'Classic Pro',
+        description: 'Clear, structured answers for steady day-to-day tasks.',
       },
       'longclaw-clawing-1.1-low': {
-        tagline: 'New · Ultra Fast',
-        description:
-          'Upgraded 1.1 edition of 1 Low; cleaner formatting, sharper precision, and near-zero latency.',
+        tagline: 'Instant',
+        description: 'Fastest option for short questions, edits, and translations.',
       },
       'longclaw-clawing-1.1': {
-        tagline: 'New · Standard',
-        description:
-          '1.1 standard model; built for natural expression, structured writing, and smooth daily chats.',
+        tagline: 'Standard',
+        description: 'Plain, clear conversation for everyday use.',
       },
     },
     nav: {
-      whatItDoes: 'What it does',
+      whatItDoes: 'Commands',
       depths: 'Depths',
       benchmarks: 'Benchmarks',
       faq: 'FAQ',
-      toggleTheme: 'Toggle theme',
+      toggleTheme: 'Switch theme',
       signIn: 'Sign in',
       start: 'Start',
       chooseLanguage: 'Choose language',
     },
     landing: {
-      poweredBy: 'Powered by LongClaw Clawing',
-      heroTitleLine1: 'Write what’s on your mind,',
-      heroTitleLine2: 'let Longclaw organize it.',
-      heroSubtitle:
-        'A quiet companion at your side when drafting an email, skimming a long document, or untangling a topic for the third time.',
-      startFree: 'Start for free',
+      poweredBy: 'Longclaw AI',
+      heroTitleLine1: 'Think faster.',
+      heroTitleLine2: 'Build anything.',
+      heroSubtitle: 'One workspace for chat, code, images, and your Google apps.',
+      startFree: 'Start free',
       benchmarksCta: 'Benchmarks',
       demoConversations: [
         {
-          q: 'Write a short message to reschedule a meeting.',
-          a: 'Hi, could we move tomorrow’s meeting to Thursday? Something urgent just came up on my end.',
+          q: 'Summarize the key points from my last three emails',
+          a: '1. Design review moved to Thursday 14:00. 2. Q4 budget approved. 3. Waiting on your sign-off for the homepage copy.',
         },
         {
-          q: 'What’s a polite way to ask for an update?',
-          a: 'In a formal email: “Could you please share an update when you have a moment?” Casual: “Quick check-in—how’s this looking?”',
+          q: 'Build a clean dark-mode timer I can test right here',
+          a: 'Ready in the live preview panel — start, pause, or reset directly beside the chat.',
         },
         {
-          q: 'Make this warmer: Your request has been noted.',
-          a: 'Got your message—I’m taking a look right now and will get back to you shortly!',
+          q: '/takvim Add a team call tomorrow at 10:00',
+          a: 'Added "Team Call" to your calendar for tomorrow, 10:00–11:00.',
         },
       ],
-      sidebarMockTitle: 'Daily Notes',
-      familyEyebrow: 'LongClaw Clawing Family',
-      familyTitle: 'Four distinct models for every need.',
-      familySubtitle:
-        'Switch between 1.2 Ultra, Ultra, Pro, or fast mode right from the chat bar.',
-      compareBenchmarks: 'Compare with other models (Benchmarks)',
-      timelineTitle: 'What do people ask Longclaw in a day?',
+      sidebarMockTitle: 'Workspace',
+      familyEyebrow: 'Models',
+      familyTitle: 'Pick your speed.',
+      familySubtitle: 'Switch models anytime inside the chat bar.',
+      compareBenchmarks: 'See full test scores',
+      showcaseEyebrow: 'Workspace',
+      showcaseTitle: 'Simple tools that work.',
+      showcaseCards: {
+        reasoningKicker: '01 · Reasoning',
+        reasoningTitle: 'See how it thinks.',
+        reasoningDesc: 'Open the step-by-step thought process on any complex answer.',
+        reasoningAlt: 'Minimalist workspace with structured technical notes',
+        codingKicker: '02 · Live Preview',
+        codingTitle: 'Run code instantly.',
+        codingDesc: 'Preview HTML, apps, and visuals right next to your conversation.',
+        codingAlt: 'Live code development and split preview workspace',
+      },
+      heroImageAlt: 'Calm coastal beach with gentle ocean waves and pale morning sand',
+      depthsImageAlt: 'Three minimalist optical glass blocks representing fast, balanced, and deep reasoning',
+      heroThinkingBadge: 'Longclaw',
+      timelineTitle: 'Type / and get it done.',
       timelineItems: [
         {
-          time: '09:12',
-          title: 'A quick email',
-          prompt: '“Write a two-sentence thank-you note to a client.”',
-          answer:
-            '“Thank you sincerely for your support and trust. We look forward to planning the next milestone together with you.”',
+          time: '/gmail',
+          title: 'Send emails',
+          prompt: '/gmail Send the project update to Maya',
+          answer: 'Sent from your Gmail account.',
         },
         {
-          time: '11:40',
-          title: 'Meeting notes',
-          prompt: '“Distill these messy notes into three bullet points.”',
-          answer:
-            '• Budget revision approved\n• Launch date set for November 14\n• UI designs due this Friday',
+          time: '/takvim',
+          title: 'Add events',
+          prompt: '/takvim Lunch with Alex Friday at 13:00',
+          answer: 'Added to Google Calendar.',
         },
         {
-          time: '14:05',
-          title: 'Polishing a sentence',
-          prompt: '“How do I say this more politely and formally?”',
-          answer: '“Would you mind sharing the updated project report by Friday afternoon?”',
+          time: '/drive',
+          title: 'Find files',
+          prompt: '/drive Show my Q4 slides',
+          answer: 'Found and opened your file from Google Drive.',
         },
         {
-          time: '17:30',
-          title: 'Tomorrow’s plan',
-          prompt: '“Make a priority to-do list for tomorrow.”',
-          answer:
-            '1. Finish the quarterly report\n2. Send invoices to accounting\n3. Add the dentist appointment to the calendar',
+          time: '/döküman',
+          title: 'Create docs',
+          prompt: '/döküman Write a launch checklist',
+          answer: 'Created a new Google Doc with your checklist.',
         },
         {
-          time: '22:10',
-          title: 'While studying',
-          prompt: '“What’s the main difference between osmosis and diffusion?”',
-          answer:
-            'Osmosis is strictly the movement of water molecules across a semipermeable membrane. Diffusion is the spontaneous spread of any substance from a region of higher concentration to lower concentration.',
+          time: '/görev',
+          title: 'Save tasks',
+          prompt: '/görev Renew domain before Monday',
+          answer: 'Saved to Google Tasks.',
         },
       ],
-      depthsTitle: 'Same question, three depths.',
-      depthsSubtitle:
-        'See how the same model responds across Fast, Balanced, and Deep thinking efforts.',
-      depthPrompt: '“Why is the sky blue?”',
+      depthsTitle: 'Short answer or full breakdown.',
+      depthsSubtitle: 'Choose Fast, Balanced, or Deep for any question.',
+      depthPrompt: 'How should I price a new software product?',
       depthAnswers: [
         {
           title: 'Fast',
-          desc: 'When you’re in a rush and the question is simple.',
+          desc: 'One line, straight to the point.',
           width: '30%',
-          text: 'Because blue wavelengths in sunlight scatter much more strongly off gas molecules in Earth’s atmosphere than other colors.',
+          text: 'Start with 2–3 simple tiers anchored to the value you save users, not your server cost.',
         },
         {
           title: 'Balanced',
-          desc: 'For everyday tasks and most general explanations.',
+          desc: 'Clear summary and recommendation.',
           width: '65%',
-          text: 'Sunlight looks white, but it contains all colors of the spectrum. Gas molecules in the atmosphere scatter short-wavelength blue light far more than longer red wavelengths.\n\nBecause that scattered blue light reaches our eyes from every direction, the sky appears blue.',
+          text: 'Avoid pricing by cost. Look at what your product replaces or saves each month, then price at roughly 10–20% of that value.\n\nKeep it to a free tier to build trust, one clear Pro plan, and a Team plan.',
         },
         {
           title: 'Deep',
-          desc: 'For complex topics, comparisons, and cause-and-effect chains.',
+          desc: 'Step-by-step full plan.',
           width: '100%',
-          text: 'This effect is called Rayleigh scattering. Scattering intensity is inversely proportional to the fourth power of wavelength, so ~450 nm blue light scatters nearly 6× more strongly in the atmosphere than red light.\n\nWhy not violet? The Sun emits less violet light than blue, and human cone receptors are far more sensitive to blue.',
+          text: '1. Value metric: Tie price to something that grows naturally with customer success (seats, projects, or usage).\n2. Tier structure: Free for discovery, Pro ($15–$29/mo) for individuals, Team for shared workflows.\n3. Test early: Launch with annual billing at a 20% discount and raise prices for new users once conversion stays above 5%.',
         },
       ],
-      checklistTitle: 'The little things',
+      checklistTitle: 'What’s inside',
       checklistItems: [
-        'Secure sign-in with Google, Apple, and verified Email',
-        'Cloud sync across all your devices with Firebase Firestore',
-        'Fast / Balanced / Deep thinking effort on a single model',
-        'Visible AI thinking steps and live code result preview',
-        'Quick keyboard shortcuts: New chat (Ctrl/⌘ + K) & Sidebar (Ctrl/⌘ + B)',
-        'Pin important conversations to the top',
-        'Attach code and text files (.txt, .md, .py)',
-        'One-click copy & Markdown export',
-        'Light and dark theme support',
+        'Google, Apple, and email sign-in',
+        'Synced across desktop and mobile',
+        'Direct /gmail, /takvim, /drive, /döküman, and /görev commands',
+        'Custom /commands in Settings',
+        'Fast, Balanced, and Deep modes',
+        'Live code preview panel',
+        'Image upload and generation',
+        'Pinned chats and instant search',
+        'Clean black & white light and dark themes',
       ],
-      mockSearchPlaceholder: 'summary...',
-      mockPinnedTitle: 'Meeting summary (Pinned)',
-      mockNote1: 'Summarization methods',
-      mockNote2: 'Weekly plan',
-      mockNote3: 'Client email draft',
-      faqTitle: 'Frequently asked',
+      mockSearchPlaceholder: 'search chats...',
+      mockPinnedTitle: 'Product roadmap',
+      mockNote1: 'API architecture',
+      mockNote2: 'Sprint plan',
+      mockNote3: 'Release list',
+      faqTitle: 'Questions',
       faqs: [
         {
           q: 'Is it free?',
-          a: 'Yes, trying Longclaw is completely free. It runs on Firebase and Google Gemini infrastructure.',
+          a: 'Yes. Create an account and start right away.',
         },
         {
-          q: 'Where are my conversations stored?',
-          a: 'When you sign in, your chats are securely stored in Firebase Firestore under your account. You can delete any chat or all of your data at any time.',
+          q: 'How do Google commands work?',
+          a: 'Connect your Google account in Connectors, then type /gmail, /takvim, /drive, /döküman, or /görev in chat.',
         },
         {
-          q: 'How do I sign in with Google or Apple?',
-          a: 'Click the Google or Apple button on the sign-in modal to connect with one click without entering a password.',
+          q: 'Can I add my own commands?',
+          a: 'Yes. Create and save custom /command shortcuts anytime in Settings.',
         },
         {
-          q: 'Which languages does it support?',
-          a: 'You can switch the interface between English and Turkish anytime, and in chat Longclaw naturally replies in whichever language you write.',
+          q: 'Can I delete my chats?',
+          a: 'Delete any thread in one click, or remove your entire account whenever you want.',
         },
       ],
-      getStartedNow: 'Get Started',
-      footerTagline: 'Write, summarize, translate, think. All in a single chat.',
-      footerNavHeading: 'Navigation',
+      getStartedNow: 'Start free',
+      footerTagline: 'Chat, code, images, and commands in one place.',
+      footerNavHeading: 'Pages',
       footerBackToTop: 'Back to top',
-      footerLegalHeading: 'Legal & Security',
+      footerLegalHeading: 'Legal',
       footerPrivacy: 'Privacy Policy',
       footerTerms: 'Terms of Use',
       footerKvkk: 'Data Protection (KVKK)',
-      footerCopyright: 'Longclaw © 2026. All rights reserved.',
+      footerCopyright: 'Longclaw © 2026',
     },
     benchmarks: {
       backToHome: 'Back to home',
-      eyebrow: 'Evaluation & Benchmarks · November 2026',
-      title: 'Realistic comparison against frontier models.',
+      eyebrow: 'Evaluation Notes · November 2026',
+      title: 'A straightforward look at the numbers.',
       subtitle:
-        'We tested the new MMLU-Pro specialist Longclaw Clawing 1.2 Ultra alongside the entire LongClaw family across language nuance, academic knowledge, coding, math, and output throughput.',
+        'We ran the Longclaw model family through language nuance, general knowledge, coding, math, and streaming speed evaluations alongside widely used models under identical prompts.',
       testYourself: 'Try it yourself',
       takeaways: {
         ultra12:
-          'Leader in MMLU-Pro (84.6%) and GPQA Diamond (71.4%); a PhD-level multi-step reasoning powerhouse.',
+          'Top marks on MMLU-Pro (84.6%) and GPQA Diamond (71.4%)—most dependable when a question takes several careful steps.',
         ultra11:
-          'Strong in language nuance (86.8%) and instruction following; the architecture & research standard prior to 1.2 Ultra.',
+          'Strong nuance (86.8%) and clean instruction adherence for long research sessions and reviews.',
         pro11:
-          'The Pro upgrade of Clawing 1.1: balanced daily Pro with 61.2% LiveCodeBench and 88 tok/s speed.',
+          'Our balanced Pro tier at 61.2% LiveCodeBench and 88 tok/s—quick enough to stay in flow.',
         low11:
-          'The 1.1 upgrade of 1 Low: instant 184 tok/s speed paired with 79.8% nuance accuracy.',
+          'Streams at 184 tok/s while keeping 79.8% nuance accuracy for fast everyday checks.',
       },
       tabs: {
         all: 'All',
@@ -1032,77 +1310,77 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       startChatting: 'Start chatting',
     },
     auth: {
-      titleForgot: 'Password Reset & Verification',
+      titleForgot: 'Reset Your Password',
       titleDefault: 'Welcome to Longclaw',
-      subtitle: 'Smart assistant powered by Google Firebase & Gemini',
+      subtitle: 'Pick up where you left off or set up a fresh workspace',
       backToSignIn: 'Back to sign in',
       forgotDesc:
-        'Enter the email address registered to your account. We will send you a verification and password reset link to confirm your identity.',
+        'Enter the email address on your account and we’ll send over a quick verification and reset link.',
       emailPlaceholder: 'Your email address',
       sending: 'Sending...',
-      sendVerificationEmail: 'Send Verification Email',
-      haveCodePrompt: 'Already have a verification code? Enter code',
-      verificationStepTitle: 'Email Verification Step',
+      sendVerificationEmail: 'Send Reset Link',
+      haveCodePrompt: 'Already got a verification code? Enter it here',
+      verificationStepTitle: 'Email Verification',
       verificationStepVerified: (email) =>
-        `${email} has been verified. Set your new password.`,
+        `${email} is verified. Go ahead and choose a new password.`,
       verificationStepDefault:
-        'You can click the reset link in your email directly or paste the verification code from the link below to reset your password.',
-      codePlaceholder: 'Verification code or link from email',
+        'Click the reset link we sent to your inbox, or paste the verification code from that email below.',
+      codePlaceholder: 'Verification code or link',
       newPasswordPlaceholder: 'New password (at least 6 characters)',
-      verifying: 'Verifying...',
-      verifyAndUpdatePassword: 'Verify Email & Update Password',
-      resendVerificationEmail: 'Resend verification email',
+      verifying: 'Checking...',
+      verifyAndUpdatePassword: 'Update Password',
+      resendVerificationEmail: 'Send another link',
       continueWithGoogle: 'Continue with Google',
-      continueWithApple: 'Sign in with Apple',
-      orWithEmail: 'or with email',
+      continueWithApple: 'Continue with Apple',
+      orWithEmail: 'or use email',
       tabSignIn: 'Sign in',
-      tabSignUp: 'Sign up',
+      tabSignUp: 'Create account',
       namePlaceholder: 'Your name',
       emailShortPlaceholder: 'Email',
       passwordPlaceholder: 'Password (at least 6 characters)',
-      forgotPasswordLink: 'Forgot password? (Verify via email)',
+      forgotPasswordLink: 'Forgot password?',
       tosPrefix: 'I have read and agree to the ',
       tosTerms: 'Terms of Use',
       tosAnd: ' and ',
       tosPrivacy: 'Privacy Policy',
       tosSuffix: '.',
-      processing: 'Processing...',
+      processing: 'One moment...',
       createAccount: 'Create account',
       signInBtn: 'Sign in',
-      footerSecurity: 'Your data is encrypted and protected in Firebase Firestore.',
+      footerSecurity: 'Your conversations stay private and tied only to your account.',
       errors: {
-        popupClosed: 'Sign-in window was closed.',
+        popupClosed: 'Sign-in window was closed before finishing.',
         accountExistsDifferentCred:
-          'Another sign-in provider is already associated with this email address.',
-        googleGeneric: 'Something went wrong while signing in with Google.',
+          'That email is already linked to a different sign-in method.',
+        googleGeneric: 'Couldn’t finish signing in with Google. Want to try again?',
         applePopupClosed: 'Apple sign-in window was closed.',
-        appleNotAllowed: 'Apple sign-in is not enabled in the Firebase console.',
-        appleGeneric: 'An error occurred while signing in with Apple.',
-        invalidEmail: 'Please enter a valid email address.',
-        shortPassword: 'Password must be at least 6 characters long.',
-        acceptTos: 'You must accept the Terms of Use and Privacy Policy to continue.',
+        appleNotAllowed: 'Apple sign-in isn’t turned on right now.',
+        appleGeneric: 'Something went wrong while signing in with Apple.',
+        invalidEmail: 'That doesn’t look like a valid email address.',
+        shortPassword: 'Use at least 6 characters for your password.',
+        acceptTos: 'Please review and accept the Terms of Use and Privacy Policy first.',
         accountCreatedInfo:
-          'Your account has been created and a verification link was sent to your email.',
-        emailInUse: 'This email address is already registered. Try signing in instead.',
-        invalidCredential: 'Incorrect email or password.',
-        userNotFound: 'No account found with this email address.',
+          'You’re all set—we dropped a quick verification link into your inbox.',
+        emailInUse: 'That email already has an account. Try signing in instead.',
+        invalidCredential: 'Email or password didn’t match.',
+        userNotFound: 'We couldn’t find an account with that email.',
         operationNotAllowed:
-          'Email/password sign-in must be enabled in Firebase Console > Authentication.',
-        genericAuth: 'An error occurred during authentication.',
+          'Email sign-in isn’t enabled right now.',
+        genericAuth: 'Something went wrong—please try again.',
         invalidEmailReset:
-          'Please enter a valid email address to receive the verification email.',
+          'Enter a valid email address so we know where to send the reset link.',
         resetSentInfo: (email) =>
-          `A password reset and verification link has been sent to ${email}. Click the link in your inbox or paste the verification code below.`,
-        resetUserNotFound: 'No user found registered with this email address.',
-        resetSendFailed: (msg) => `Could not send verification email: ${msg}`,
-        missingResetCode: 'Please paste the verification code or link from your email.',
-        shortNewPassword: 'Your new password must be at least 6 characters long.',
+          `We sent a reset link to ${email}. Click it in your inbox or paste the code below.`,
+        resetUserNotFound: 'No account is registered with that email address.',
+        resetSendFailed: (msg) => `Couldn’t send the email: ${msg}`,
+        missingResetCode: 'Paste the verification code or link from your email first.',
+        shortNewPassword: 'Your new password needs at least 6 characters.',
         resetSuccessInfo: (email) =>
-          `${email} has been verified and your password was updated! You can now sign in with your new password.`,
+          `${email} is verified and your password is updated. You can sign in now.`,
         expiredActionCode:
-          'The verification code has expired. Please request a new verification email.',
-        invalidActionCode: 'Invalid or already used verification code.',
-        resetVerifyFailed: 'Could not verify password reset.',
+          'That code has expired. Go ahead and request a fresh link.',
+        invalidActionCode: 'That code looks invalid or was already used.',
+        resetVerifyFailed: 'Couldn’t verify that reset code.',
       },
     },
     legal: {
@@ -1111,42 +1389,159 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         gizlilik: {
           title: 'Privacy Policy',
           content: [
-            'This policy explains what data is processed and how it is protected when using Longclaw. We are committed to safeguarding your privacy to the highest standards.',
-            'What data do we collect? Your account details via Firebase Authentication (name, email address, profile photo), securely stored chat history in Firestore, and preferences (theme, depth mode, language).',
-            'How do we use it? To sync your conversation history securely across your devices, generate intelligent Gemini responses, and keep your session secure.',
-            'Who do we share it with? Google Firebase is used for authentication and database storage, and the Google Gemini API is used to generate AI responses. Your data is never sold or shared for marketing.',
-            'Retention and deletion: You can delete individual chats or permanently remove your entire account and all associated data from the profile menu at any time.',
+            'Here is a plain-English overview of what Longclaw stores and how your information is handled.',
+            'What we keep: When you sign in, we store your account basics (name, email, photo), your saved chats, and your workspace preferences like theme and language.',
+            'Why we keep it: So your threads stay synced between devices, your session stays safe, and Longclaw can answer your prompts.',
+            'No data selling: We never sell your conversations or hand your data over for advertising or marketing.',
+            'Your control: Delete individual chats anytime, or remove your entire account and all saved history straight from the profile menu.',
           ],
         },
         sartlar: {
           title: 'Terms of Use',
           content: [
-            'Welcome to Longclaw. By using this service, you agree to these Terms of Use.',
-            'Scope of service: Longclaw is an AI assistant built to help you think, write, summarize, and research.',
-            'AI-generated output: AI models may occasionally produce inaccurate or incomplete information. Responses do not constitute medical, legal, or financial professional advice; verify critical decisions independently.',
-            'Acceptable use: You may not use the service for illegal activities, harmful content generation, or attempts to disrupt system security.',
-            'Account security: Keeping your login credentials secure is the responsibility of the account holder.',
+            'Welcome to Longclaw. Using the app means you’re okay with these simple ground rules.',
+            'What it’s for: Longclaw is a workspace for writing, sorting notes, coding, and thinking through everyday questions.',
+            'Double-check important facts: Automated replies can occasionally miss details or get things wrong. Don’t rely on them as a substitute for medical, legal, or financial professionals.',
+            'Fair use: Please don’t use the service for harmful, illegal, or disruptive activity.',
+            'Account care: Keep your login credentials safe—you’re responsible for activity under your account.',
           ],
         },
         kvkk: {
           title: 'Data Protection Notice (KVKK)',
           content: [
-            'This notice is provided under Law No. 6698 on the Protection of Personal Data (KVKK).',
-            'Personal data processed: Identity info (name), contact info (email address), usage logs, and chat content.',
-            'Purposes of processing: Account creation, delivering AI assistant functionality, preventing data loss, and ensuring information security.',
-            'Data transfer: Authentication and database infrastructure run on Google Firebase, while AI processing runs via the Google Gemini API.',
-            'Your rights: Under Article 11 of KVKK, you have the right to access your personal data, request corrections, and request complete deletion.',
+            'Provided in accordance with Law No. 6698 on the Protection of Personal Data (KVKK).',
+            'Data processed: Your name, email address, account settings, and the conversations you save.',
+            'Purpose: Running your account, syncing chat history across your devices, and keeping your workspace secure.',
+            'Storage: Your information is stored in encrypted cloud infrastructure strictly for operating the service.',
+            'Your rights: Under Article 11 of KVKK, you can access your data, ask for corrections, or request full deletion anytime.',
           ],
         },
       },
     },
     chat: {
       suggestions: [
-        'Explain quantum computing simply',
-        'How can I improve my time management?',
-        'Write a warm, concise thank-you email to a client',
-        'Summarize this text in three key bullet points:',
+        'Explain quantum computing without the jargon',
+        'Help me plan a calmer workweek',
+        'Write a warm, short thank-you note to a client',
+        'Boil this text down to three clear points:',
       ],
+      emptyWorkspace: {
+        greetingMorning: (name) => `Good morning, ${name}`,
+        greetingAfternoon: (name) => `Good afternoon, ${name}`,
+        greetingEvening: (name) => `Good evening, ${name}`,
+        subtitle: 'Write whatever is on your mind below, drop in a photo or file, or pick a prompt to get moving.',
+        tabs: {
+          everyday: 'Everyday',
+          write: 'Writing',
+          code: 'Code',
+          gmail: 'Gmail',
+        },
+        starters: {
+          everyday: [
+            {
+              title: 'Make a tricky topic click',
+              subtitle: 'Explain quantum computing without textbook jargon',
+              prompt: 'Explain how quantum computing works using simple everyday comparisons, no heavy jargon',
+            },
+            {
+              title: 'Plan a calmer week',
+              subtitle: 'Room for real focus, meetings, and breathing space',
+              prompt: 'Help me sketch a realistic weekly schedule that protects focus time without burning out',
+            },
+            {
+              title: 'Compare two options clearly',
+              subtitle: 'Weigh trade-offs, hidden risks, and get a direct pick',
+              prompt: 'Compare these two options with pros, cons, and hidden trade-offs:',
+            },
+            {
+              title: 'Build a 14-day learning path',
+              subtitle: 'Hands-on daily milestones from scratch',
+              prompt: 'Create a practical 14-day learning roadmap with daily hands-on exercises for:',
+            },
+          ],
+          write: [
+            {
+              title: 'Write a warm client thank-you',
+              subtitle: 'Concise, human, and never robotic',
+              prompt: 'Write a warm, concise thank-you email to a client after wrapping up a project',
+            },
+            {
+              title: 'Distill into three key takeaways',
+              subtitle: 'Pull out main points and concrete next steps',
+              prompt: 'Summarize this text into three key takeaways and any action items:',
+            },
+            {
+              title: 'Tighten and polish a draft',
+              subtitle: 'Keep your voice while cutting filler and repetition',
+              prompt: 'Tighten and clarify this draft while keeping a natural, human tone:',
+            },
+            {
+              title: 'Turn rough notes into an agenda',
+              subtitle: 'Organize decisions, owners, and follow-ups cleanly',
+              prompt: 'Organize these rough meeting notes into decisions, owners, and next steps:',
+            },
+          ],
+          code: [
+            {
+              title: 'Build a live interactive widget',
+              subtitle: 'A clean, minimal Pomodoro timer with instant preview',
+              prompt: 'Build a clean, minimalist Pomodoro timer in a single HTML file with live preview',
+            },
+            {
+              title: 'Debug and explain a snippet',
+              subtitle: 'Identify the root cause and show the cleanest fix',
+              prompt: 'Find the root cause of the bug in this code and walk me through the cleanest fix:',
+            },
+            {
+              title: 'Sketch a system diagram',
+              subtitle: 'Render a crisp Mermaid architecture flow right in chat',
+              prompt: 'Create a clear Mermaid architecture diagram for a modern web app authentication and API flow',
+            },
+            {
+              title: 'Refactor for clarity and speed',
+              subtitle: 'Simplify logic without changing behavior',
+              prompt: 'Refactor this function to be cleaner, more readable, and faster:',
+            },
+          ],
+          gmail: [
+            {
+              title: 'Summarize unread emails',
+              subtitle: 'Get a calm priority brief of what arrived today',
+              prompt: 'Summarize my unread emails in order of priority',
+            },
+            {
+              title: 'Spot messages needing a reply',
+              subtitle: 'Surface important threads you should follow up on',
+              prompt: 'Check my recent emails and list the ones that look like they need a reply',
+            },
+            {
+              title: 'Find recent receipts or invoices',
+              subtitle: 'Pull key amounts, senders, and dates from your inbox',
+              prompt: 'Find recent receipts, invoices, or order confirmations in my inbox and summarize them',
+            },
+            {
+              title: 'Draft a thoughtful reply',
+              subtitle: 'Review and confirm before saving or sending in Gmail',
+              prompt: 'Draft a polite, concise reply to my most recent important email',
+            },
+          ],
+        },
+        gmailPromptConnectTitle: 'Bring your Gmail inbox into Longclaw',
+        gmailPromptConnectDesc:
+          'Summarize unread mail, search receipts and threads, and draft replies with your confirmation.',
+        gmailConnectAction: 'Connect Gmail',
+        gmailBrowseAction: 'Open Gmail inbox',
+        gmailConnectedLabel: 'Gmail connected',
+        gmailDisconnectedLabel: 'Connect Gmail',
+        quickActionsTitle: 'Workspace tools',
+        uploadFileTitle: 'Attach a file',
+        uploadFileDesc: 'Drop in code, CSV, Markdown, or notes to analyze right away',
+        connectorsCardTitle: 'Gmail connector',
+        connectorsCardDescConnected: 'Search your inbox, attach threads, or compose a message',
+        connectorsCardDescDisconnected: 'Connect your inbox to summarize threads and draft replies',
+        recentChatsTitle: 'Pick up where you left off',
+        messagesCount: (count) => `${count} ${count === 1 ? 'message' : 'messages'}`,
+      },
       backToLandingTitle: 'Back to landing page',
       closeMenuAria: 'Close menu',
       newChatTitle: 'New chat',
@@ -1186,14 +1581,14 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       helloUser: (name) => `Hello, ${name}`,
       defaultFriendName: 'Friend',
       emptySubtitle: 'Ask a question or try one of the quick prompts below.',
-      thoughtsLabel: 'Thoughts',
+      thoughtsLabel: 'Working notes',
       secondsShort: 's',
       copied: 'Copied',
       copy: 'Copy',
-      regenerate: 'Regenerate',
-      thinking: 'Thinking…',
-      inputPlaceholder: 'Ask Longclaw anything...',
-      attachFileTitle: 'Attach text / code file',
+      regenerate: 'Try again',
+      thinking: 'Thinking it through…',
+      inputPlaceholder: 'Write whatever’s on your mind, or type / for commands...',
+      attachFileTitle: 'Attach image or file',
       selectModelTitle: 'Choose model',
       modelSelectionAria: 'Model selection',
       chooseModel: 'Choose a model',
@@ -1229,6 +1624,57 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         mobileView: 'Mobile view (390px)',
         clearConsole: 'Clear',
         noConsoleOutput: 'No console output yet.',
+      },
+      connectors: {
+        title: 'Connectors',
+        subtitle: 'Connect your tools with your permission so Longclaw can work with real data.',
+        openButtonTitle: 'Connectors (Gmail)',
+        gmailName: 'Gmail',
+        gmailDesc: 'Search your inbox, summarize emails, and draft or send replies with your confirmation.',
+        connectedAs: (email) => `Connected as ${email}`,
+        notConnected: 'Not connected',
+        signInWithGoogle: 'Sign in with Google',
+        connecting: 'Connecting...',
+        disconnect: 'Disconnect',
+        useInChatLabel: 'Use Gmail in chat',
+        useInChatHint: 'Automatically reads relevant emails when you ask about your inbox or messages.',
+        inboxTab: 'Inbox',
+        composeTab: 'Compose',
+        searchPlaceholder: 'Search Gmail (e.g. invoice, is:unread)...',
+        searchButton: 'Search',
+        refreshTitle: 'Refresh',
+        loadingInbox: 'Loading emails...',
+        emptyInbox: 'No matching emails found.',
+        unreadLabel: 'Unread',
+        attachToChat: 'Ask in chat',
+        replyButton: 'Reply',
+        toLabel: 'To',
+        toPlaceholder: 'name@example.com',
+        subjectLabel: 'Subject',
+        subjectPlaceholder: 'Email subject',
+        bodyLabel: 'Message',
+        bodyPlaceholder: 'Write your message here...',
+        saveDraftButton: 'Save Draft',
+        sendEmailButton: 'Send Email',
+        confirmSendTitle: 'Send this email via Gmail?',
+        confirmDraftTitle: 'Save this draft to Gmail?',
+        confirmSendDesc: 'Once confirmed, this message will be sent directly from your Gmail account.',
+        confirmDraftDesc: 'Once confirmed, this message will be saved to your Gmail Drafts folder.',
+        confirmSendButton: 'Confirm & Send',
+        confirmDraftButton: 'Confirm & Save Draft',
+        cancelButton: 'Cancel',
+        sending: 'Sending...',
+        savingDraft: 'Saving...',
+        sentSuccess: 'Email sent via Gmail.',
+        draftSavedSuccess: 'Draft saved to your Gmail account.',
+        missingFieldsError: 'Please enter a recipient email address and a subject or message.',
+        sessionExpired: 'Your Gmail session expired. Please reconnect.',
+        connectFailed: 'Could not connect Gmail. Please try again.',
+        draftCardTitle: 'Gmail Draft',
+        reviewAndSaveDraft: 'Review & save draft',
+        reviewAndSend: 'Review & send',
+        connectToSendHint: 'Connect Gmail first to save drafts or send emails.',
+        readingGmailStatus: 'Checking Gmail…',
       },
     },
   },

@@ -31,15 +31,15 @@ export function LegalModal({ type, lang, onClose }: LegalModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-[var(--card)] text-[var(--tx)] border border-[var(--bd)] rounded-3xl p-5 sm:p-8 shadow-2xl relative"
+            className="surface-3d-elevated w-full max-w-xl max-h-[88dvh] overflow-y-auto text-[var(--tx)] rounded-3xl p-5 sm:p-8 relative"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 sm:top-5 sm:right-5 w-10 h-10 flex items-center justify-center rounded-full hover:bg-[var(--surf)] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 w-9 h-9 flex items-center justify-center rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer"
               aria-label={t.close}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4.5 h-4.5" />
             </button>
 
             <h3 className="font-serif-fraunces text-xl sm:text-2xl font-semibold mb-4 sm:mb-5 pr-10">
@@ -56,7 +56,7 @@ export function LegalModal({ type, lang, onClose }: LegalModalProps) {
 
             <button
               onClick={onClose}
-              className="w-full mt-7 py-3 rounded-full border border-[var(--bd)] bg-[var(--surf)] hover:bg-[var(--card)] font-medium text-sm transition-all cursor-pointer"
+              className="btn-3d-soft w-full mt-7 py-3 rounded-full font-medium text-sm cursor-pointer"
             >
               {t.close}
             </button>

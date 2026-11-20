@@ -299,8 +299,8 @@ export default function App() {
       ...(newTitle ? { title: newTitle } : {}),
     };
 
-    setChats((prev) =>
-      prev.map((c) =>
+    setChats((prev) => {
+      const next = prev.map((c) =>
         c.id === chatId
           ? {
               ...c,
@@ -308,16 +308,21 @@ export default function App() {
               ...(newTitle ? { title: newTitle } : {}),
             }
           : c
-      )
-    );
+      );
+      if (!user) {
+        try {
+          localStorage.setItem('lc_guest_chats', JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
 
     if (user) {
-      await saveChatSession(user.uid, updatedChat, false);
-    } else {
       try {
-        const nextList = chats.map((c) => (c.id === chatId ? updatedChat : c));
-        localStorage.setItem('lc_guest_chats', JSON.stringify(nextList));
-      } catch {}
+        await saveChatSession(user.uid, updatedChat, false);
+      } catch (err) {
+        console.warn('Could not persist chat update:', err);
+      }
     }
   };
 

@@ -46,7 +46,7 @@ function CodeBlock({ language, code, blockIndex, options }: CodeBlockProps) {
           <button
             type="button"
             onClick={handleCopy}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 sm:px-2 sm:py-1 rounded-lg text-[11px] font-medium text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer whitespace-nowrap"
           >
             {copied ? (
               <>
@@ -69,7 +69,7 @@ function CodeBlock({ language, code, blockIndex, options }: CodeBlockProps) {
               onClick={() =>
                 options?.onOpenPreview?.(code, detectedLang || language, blockIndex)
               }
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--ac)] text-[var(--on)] text-[11px] font-medium hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+              className="inline-flex items-center gap-1 px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-full bg-[var(--ac)] text-[var(--on)] text-[11px] font-medium hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
             >
               <Play className="w-3 h-3 fill-current" />
               <span>{options?.openResultLabel || 'Open result'}</span>
@@ -134,7 +134,7 @@ export function renderMarkdown(
     parts.push(renderTextSegment(content.slice(lastIndex), lastIndex));
   }
 
-  return <div className="space-y-2">{parts}</div>;
+  return <div className="space-y-2 min-w-0 max-w-full">{parts}</div>;
 }
 
 function renderTextSegment(text: string, baseKey: number): React.ReactNode {

@@ -29,13 +29,15 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  where,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-// CRITICAL: Must pass firestoreDatabaseId according to Firebase skill
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const firestoreDatabaseId = (firebaseConfig as { firestoreDatabaseId?: string })
+  .firestoreDatabaseId;
+export const db = firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
 export const auth = getAuth(app);
 
 // Authentication Providers
@@ -108,6 +110,23 @@ export async function testConnection() {
 testConnection();
 
 // Types for Chat & Messages
+export interface GeneratedImageData {
+  url?: string;
+  dataUrl?: string;
+  svg?: string;
+  title: string;
+  prompt: string;
+  enhancedPrompt?: string;
+  aspectRatio: '1:1' | '16:9' | '4:3' | '9:16';
+}
+
+export interface AttachedImage {
+  id: string;
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -118,6 +137,8 @@ export interface ChatMessage {
   dur?: number;
   stopped?: boolean;
   modelId?: string;
+  images?: AttachedImage[];
+  generatedImage?: GeneratedImageData;
   createdAt?: number;
 }
 
@@ -129,6 +150,16 @@ export interface ChatSession {
   depth: 'fast' | 'mid' | 'deep';
   pin?: boolean;
   messages: ChatMessage[];
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface CustomSlashCommand {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  prompt: string;
   createdAt?: any;
   updatedAt?: any;
 }
@@ -165,22 +196,94 @@ export function subscribeToUserChats(
   }
 }
 
+function stripUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefinedDeep(item)) as unknown as T;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value as Record<string, any>)) {
+      if (v !== undefined) {
+        out[k] = stripUndefinedDeep(v);
+      }
+    }
+    return out as T;
+  }
+  return value;
+}
+
+function prepareMessagesForFirestore(rawMessages: ChatMessage[]): ChatMessage[] {
+  const sliced = (rawMessages || []).slice(-1000).map((m) => stripUndefinedDeep(m));
+  const MAX_BYTES = 700_000;
+
+  let jsonSize = 0;
+  try {
+    jsonSize = JSON.stringify(sliced).length;
+  } catch {
+    return sliced;
+  }
+  if (jsonSize <= MAX_BYTES) return sliced;
+
+  // Progressively trim oldest bulky inline image blobs so Firestore never fails the 1MB doc limit
+  const cloned = sliced.map((m) => ({
+    ...m,
+    ...(m.images ? { images: m.images.map((img) => ({ ...img })) } : {}),
+    ...(m.generatedImage ? { generatedImage: { ...m.generatedImage } } : {}),
+  }));
+
+  for (let i = 0; i < cloned.length && jsonSize > MAX_BYTES; i++) {
+    const msg = cloned[i];
+    if (msg.generatedImage?.dataUrl && msg.generatedImage?.url) {
+      delete msg.generatedImage.dataUrl;
+      jsonSize = JSON.stringify(cloned).length;
+    }
+    if (jsonSize > MAX_BYTES && msg.images && msg.images.length > 0 && i < cloned.length - 1) {
+      delete msg.images;
+      jsonSize = JSON.stringify(cloned).length;
+    }
+  }
+
+  return cloned;
+}
+
 export async function saveChatSession(userId: string, chat: ChatSession, isNew = false) {
   const path = `users/${userId}/chats/${chat.id}`;
   try {
     const docRef = doc(db, 'users', userId, 'chats', chat.id);
-    const dataToSave = {
-      id: chat.id,
-      userId,
+    const safeMessages = prepareMessagesForFirestore(chat.messages || []);
+    const baseFields = {
       title: (chat.title || 'Yeni sohbet').slice(0, 200),
       mode: chat.mode || 'chat',
       depth: chat.depth || 'mid',
       pin: !!chat.pin,
-      messages: (chat.messages || []).slice(-1000),
+      messages: safeMessages,
       updatedAt: serverTimestamp(),
-      ...(isNew ? { createdAt: serverTimestamp() } : {}),
     };
-    await setDoc(docRef, dataToSave, { merge: !isNew });
+
+    if (isNew) {
+      await setDoc(docRef, {
+        id: chat.id,
+        userId,
+        ...baseFields,
+        createdAt: serverTimestamp(),
+      });
+      return;
+    }
+
+    try {
+      await updateDoc(docRef, baseFields);
+    } catch (updateErr: any) {
+      if (updateErr?.code === 'not-found') {
+        await setDoc(docRef, {
+          id: chat.id,
+          userId,
+          ...baseFields,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        throw updateErr;
+      }
+    }
   } catch (error) {
     handleFirestoreError(error, isNew ? OperationType.CREATE : OperationType.UPDATE, path);
   }
@@ -190,6 +293,112 @@ export async function deleteChatSession(userId: string, chatId: string) {
   const path = `users/${userId}/chats/${chatId}`;
   try {
     const docRef = doc(db, 'users', userId, 'chats', chatId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// Firestore Real-time Custom Slash Command Operations
+export function subscribeToUserCommands(
+  userId: string,
+  onUpdate: (commands: CustomSlashCommand[]) => void,
+  onError?: (err: Error) => void
+) {
+  const path = `users/${userId}/commands`;
+  try {
+    const q = query(
+      collection(db, 'users', userId, 'commands'),
+      where('userId', '==', userId)
+    );
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: CustomSlashCommand[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+        });
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        onUpdate(list);
+      },
+      (error) => {
+        try {
+          handleFirestoreError(error, OperationType.LIST, path);
+        } catch (wrapped) {
+          if (onError && wrapped instanceof Error) onError(wrapped);
+        }
+      }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return () => {};
+  }
+}
+
+export async function saveUserCommand(
+  userId: string,
+  cmd: { id: string; name: string; description: string; prompt: string },
+  isNew = false
+) {
+  const safeId = cmd.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128) || `cmd-${Date.now()}`;
+  const safeName = cmd.name
+    .trim()
+    .replace(/^\/+/, '')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9_-]/g, '')
+    .replace(/^[^a-z0-9]+/, '')
+    .slice(0, 32);
+  const safeDescription = (cmd.description || '').trim().slice(0, 140);
+  const safePrompt = (cmd.prompt || '').trim().slice(0, 2000);
+
+  if (!safeName || !safePrompt) {
+    throw new Error('Command name and instruction are required.');
+  }
+
+  const path = `users/${userId}/commands/${safeId}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'commands', safeId);
+    const mutableFields = {
+      name: safeName,
+      description: safeDescription,
+      prompt: safePrompt,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (isNew) {
+      await setDoc(docRef, {
+        id: safeId,
+        userId,
+        ...mutableFields,
+        createdAt: serverTimestamp(),
+      });
+      return;
+    }
+
+    try {
+      await updateDoc(docRef, mutableFields);
+    } catch (updateErr: any) {
+      if (updateErr?.code === 'not-found') {
+        await setDoc(docRef, {
+          id: safeId,
+          userId,
+          ...mutableFields,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        throw updateErr;
+      }
+    }
+  } catch (error) {
+    handleFirestoreError(error, isNew ? OperationType.CREATE : OperationType.UPDATE, path);
+  }
+}
+
+export async function deleteUserCommand(userId: string, commandId: string) {
+  const path = `users/${userId}/commands/${commandId}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'commands', commandId);
     await deleteDoc(docRef);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
