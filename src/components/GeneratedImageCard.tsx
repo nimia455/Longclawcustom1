@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Maximize2, X, Check, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { GeneratedImageData } from '../lib/firebase';
@@ -52,6 +52,15 @@ export function GeneratedImageCard({ image, lang }: GeneratedImageCardProps) {
   const [downloading, setDownloading] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [lightboxOpen]);
 
   const isRaster = Boolean(image.dataUrl || image.url);
 

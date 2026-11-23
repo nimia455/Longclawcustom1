@@ -31,8 +31,10 @@ import {
   Image as ImageIcon,
   Settings,
   Terminal,
+  User as UserIcon,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { LIQUID_MORPH, LIQUID_SPRING, LIQUID_TAP } from '../lib/motion';
 import {
   AttachedImage,
   ChatSession,
@@ -66,7 +68,7 @@ import {
   GmailConfirmActionDialog,
   PendingGmailAction,
 } from './ConnectorsModal';
-import { SettingsModal } from './SettingsModal';
+import { FontPreference, SettingsModal, SettingsTab } from './SettingsModal';
 import {
   SlashCommandItem,
   filterSlashCommands,
@@ -139,6 +141,8 @@ interface ChatWorkspaceProps {
   onToggleTheme: () => void;
   lang: Language;
   onChangeLang: (lang: Language) => void;
+  fontPref: FontPreference;
+  onChangeFontPref: (pref: FontPreference) => void;
   onBackToLanding: () => void;
   sidebarOpen: boolean;
   onOpenSidebar: () => void;
@@ -165,6 +169,8 @@ export function ChatWorkspace({
   onToggleTheme,
   lang,
   onChangeLang,
+  fontPref,
+  onChangeFontPref,
   onBackToLanding,
   sidebarOpen,
   onOpenSidebar,
@@ -260,7 +266,8 @@ export function ChatWorkspace({
 
   // Settings & Slash Commands state
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'commands' | 'general'>('commands');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile');
+  const [sidebarAvatarFailed, setSidebarAvatarFailed] = useState(false);
   const [customCommands, setCustomCommands] = useState<CustomSlashCommand[]>([]);
   const [slashMenuDismissed, setSlashMenuDismissed] = useState(false);
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
@@ -307,11 +314,15 @@ export function ChatWorkspace({
   };
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef<boolean>(true);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Persist selected model
   useEffect(() => {
@@ -332,6 +343,18 @@ export function ChatWorkspace({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [modelMenuOpen]);
 
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [profileMenuOpen]);
+
   // Sync depth and reset active code preview when chat changes
   useEffect(() => {
     if (currentChat) {
@@ -339,6 +362,8 @@ export function ChatWorkspace({
     }
     setCodePreview(null);
     setPreviewExpanded(false);
+    isNearBottomRef.current = true;
+    setShowScrollToBottom(false);
   }, [currentChat?.id]);
 
   // Reset slash menu highlight when query changes
@@ -427,11 +452,39 @@ export function ChatWorkspace({
     }
   };
 
-  const openSettings = (tab: 'commands' | 'general' = 'commands') => {
+  const openSettings = (tab: SettingsTab = 'profile') => {
     setSettingsTab(tab);
     setSettingsOpen(true);
     setProfileMenuOpen(false);
   };
+
+  const effectiveDisplayName = (() => {
+    void userVersion;
+    if (user?.displayName?.trim()) return user.displayName.trim();
+    if (!user) {
+      try {
+        const guest = localStorage.getItem('lc_guest_name')?.trim();
+        if (guest) return guest;
+      } catch {}
+    }
+    return t.common.defaultUser;
+  })();
+
+  const effectivePhotoUrl = (() => {
+    void userVersion;
+    if (user?.photoURL?.trim()) return user.photoURL.trim();
+    if (!user) {
+      try {
+        const guestPhoto = localStorage.getItem('lc_guest_photo')?.trim();
+        if (guestPhoto) return guestPhoto;
+      } catch {}
+    }
+    return '';
+  })();
+
+  useEffect(() => {
+    setSidebarAvatarFailed(false);
+  }, [effectivePhotoUrl]);
 
   const openCodePreview = (
     messageContent: string,
@@ -640,8 +693,24 @@ export function ChatWorkspace({
     }
   };
 
-  // Auto-scroll on new message
+  // Smart auto-scroll: follow new messages/streaming only when user is already near the bottom
+  const handleMessagesScroll = () => {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceFromBottom < 120;
+    isNearBottomRef.current = nearBottom;
+    setShowScrollToBottom(!nearBottom && (currentChat?.messages?.length || 0) > 0);
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    isNearBottomRef.current = true;
+    setShowScrollToBottom(false);
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  };
+
   useEffect(() => {
+    if (!isNearBottomRef.current) return;
     messagesEndRef.current?.scrollIntoView({
       behavior: streamingText ? 'auto' : 'smooth',
     });
@@ -827,7 +896,10 @@ export function ChatWorkspace({
       }
     }
 
-    // If a direct Workspace connector command (/gmail, /takvim, /drive, /döküman, /görev) was invoked
+    isNearBottomRef.current = true;
+    setShowScrollToBottom(false);
+
+    // If a direct Workspace connector command (/gmail, /calendar, /drive, /docs, /tasks) was invoked
     // and Workspace is not connected yet, initiate Google Workspace connection inside this user gesture.
     if (connectorCommand && !getWorkspaceAccessToken()) {
       try {
@@ -1275,37 +1347,45 @@ export function ChatWorkspace({
       let accumulatedText = '';
       let accumulatedThoughts = '';
 
+      const processNdjsonLine = (rawLine: string) => {
+        const line = rawLine.trim();
+        if (!line) return;
+        try {
+          const event = JSON.parse(line);
+          if (event.t === 'tx') {
+            accumulatedText += event.x;
+            setStreamingText(accumulatedText);
+          } else if (event.t === 'th') {
+            accumulatedThoughts += event.x;
+            setStreamingThoughts(accumulatedThoughts);
+          } else if (event.t === 'err') {
+            throw new Error(event.x || cText.streamError);
+          }
+        } catch (parseErr: any) {
+          if (!(parseErr instanceof SyntaxError)) {
+            throw parseErr;
+          }
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          buffer += decoder.decode();
+          if (buffer.trim()) {
+            processNdjsonLine(buffer);
+            buffer = '';
+          }
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         let newlineIndex: number;
 
         while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.slice(0, newlineIndex).trim();
+          const line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
-
-          if (!line) continue;
-
-          try {
-            const event = JSON.parse(line);
-            if (event.t === 'tx') {
-              accumulatedText += event.x;
-              setStreamingText(accumulatedText);
-            } else if (event.t === 'th') {
-              accumulatedThoughts += event.x;
-              setStreamingThoughts(accumulatedThoughts);
-            } else if (event.t === 'err') {
-              throw new Error(event.x || cText.streamError);
-            }
-          } catch (parseErr: any) {
-            if (parseErr instanceof SyntaxError) {
-              // Ignored partial JSON chunk
-            } else {
-              throw parseErr;
-            }
-          }
+          processNdjsonLine(line);
         }
       }
 
@@ -1346,7 +1426,7 @@ export function ChatWorkspace({
             }
           } catch {}
           if (newTitle) {
-            await onUpdateChatMessages(chatIdToTitle, finalMessages, newTitle);
+            await onRenameChat(chatIdToTitle, newTitle);
           }
         })();
       }
@@ -1523,10 +1603,14 @@ export function ChatWorkspace({
     }
   };
 
-  const handleCopyMessage = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedMessageId(id);
-    setTimeout(() => setCopiedMessageId(null), 1600);
+  const handleCopyMessage = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(id);
+      setTimeout(() => setCopiedMessageId(null), 1600);
+    } catch {
+      // Clipboard API may be blocked in restricted iframe contexts
+    }
   };
 
   // Filtered chats list
@@ -1550,52 +1634,52 @@ export function ChatWorkspace({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Architectural Sidebar */}
       <aside
-        className={`sidebar-3d fixed md:static inset-y-0 left-0 z-40 h-full shrink-0 overflow-hidden border-[var(--bd)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] w-[82vw] max-w-[300px] md:w-72 border-r ${
+        className={`sidebar-3d fixed md:static inset-y-0 left-0 z-40 h-full shrink-0 overflow-hidden border-[var(--bd)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] w-[82vw] max-w-[300px] md:w-[276px] border-r ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 ${
           sidebarOpen
-            ? 'md:w-72 md:border-r md:opacity-100'
+            ? 'md:w-[276px] md:border-r md:opacity-100'
             : 'md:w-0 md:border-r-0 md:opacity-0 md:pointer-events-none'
         }`}
       >
-        <div className="w-[82vw] max-w-[300px] md:w-72 h-full flex flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] gap-3.5">
+        <div className="w-[82vw] max-w-[300px] md:w-[276px] h-full flex flex-col px-3.5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] gap-3.5">
           {/* Brand Header */}
-          <div className="flex items-center justify-between px-1.5 py-1">
+          <div className="flex items-center justify-between px-1 py-1">
             <button
               onClick={onBackToLanding}
-              className="flex items-center gap-2 font-space font-bold text-lg text-[var(--tx)] hover:opacity-80 transition-opacity cursor-pointer"
+              className="flex items-center gap-2 font-space font-semibold text-base tracking-tight text-[var(--tx)] hover:opacity-80 transition-opacity cursor-pointer"
               title={cText.backToLandingTitle}
             >
-              <LongclawLogo className="w-6 h-6" />
+              <LongclawLogo className="w-6 h-6 text-[var(--tx)]" />
               <span>Longclaw</span>
             </button>
 
             <button
               onClick={() => onSetMobileMenuOpen(false)}
-              className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--card)]/70 transition-colors cursor-pointer"
+              className="md:hidden w-9 h-9 flex items-center justify-center rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--card)] transition-colors cursor-pointer"
               aria-label={cText.closeMenuAria}
             >
               <X className="w-4.5 h-4.5" />
             </button>
           </div>
 
-          {/* Clean Minimal Sidebar Actions (No Heavy Boxes) */}
-          <div className="space-y-1 shrink-0">
+          {/* Primary Action & Utility Stack */}
+          <div className="space-y-2 shrink-0">
             <button
               onClick={() => {
                 onNewChat();
                 onSetMobileMenuOpen(false);
               }}
               title={`${cText.newChatTitle} (${modKey}+K)`}
-              className="w-full flex items-center justify-between py-2.5 md:py-2 px-2.5 rounded-xl font-medium text-sm md:text-[13px] text-[var(--tx)] hover:bg-[var(--card)] transition-colors cursor-pointer whitespace-nowrap"
+              className="btn-3d-primary w-full flex items-center justify-between py-2.5 px-3.5 rounded-full font-medium text-sm md:text-[13px] cursor-pointer whitespace-nowrap"
             >
-              <span className="flex items-center gap-2.5">
+              <span className="flex items-center gap-2">
                 <SquarePen className="w-4 h-4 shrink-0" />
                 <span>{cText.newChatTitle}</span>
               </span>
-              <span className="hidden sm:inline text-[10px] font-mono text-[var(--mut)]">
+              <span className="hidden sm:inline text-[10px] font-mono opacity-75">
                 {modKey}+K
               </span>
             </button>
@@ -1606,7 +1690,7 @@ export function ChatWorkspace({
                 openConnectors('gmail');
                 onSetMobileMenuOpen(false);
               }}
-              className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[13px] md:text-xs font-medium text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--card)] transition-colors cursor-pointer"
+              className="btn-3d-soft w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-[13px] md:text-xs font-medium cursor-pointer"
             >
               <span className="flex items-center gap-2.5 min-w-0">
                 {workspaceConnected ? (
@@ -1616,14 +1700,14 @@ export function ChatWorkspace({
                     <GoogleDriveIcon className="w-3.5 h-3.5" />
                   </div>
                 ) : (
-                  <ConnectorsIcon className="w-4 h-4 shrink-0" />
+                  <ConnectorsIcon className="w-4 h-4 text-[var(--ac)] shrink-0" />
                 )}
                 <span className="truncate">{cText.connectors.title}</span>
               </span>
               <span
                 className={`text-[11px] shrink-0 tabular-nums font-mono ${
                   workspaceConnected
-                    ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                    ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
                     : 'text-[var(--mut)]'
                 }`}
               >
@@ -1631,22 +1715,22 @@ export function ChatWorkspace({
               </span>
             </button>
 
-            {/* Borderless Minimal Search */}
-            <div className="relative pt-1">
-              <Search className="w-3.5 h-3.5 text-[var(--mut)] absolute left-2.5 top-3.5 md:top-3 pointer-events-none" />
+            {/* Machined Recessed 3D Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-[var(--mut)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 ref={searchInputRef}
                 type="text"
                 placeholder={cText.searchPlaceholder}
-                title={`${cText.searchTitle} (/ · ${modKey}+Shift+F)`}
+                title={cText.searchTitle}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent pl-8 pr-7 py-2 md:py-1.5 text-base md:text-xs text-[var(--tx)] placeholder:text-[var(--mut)] outline-none border-b border-transparent focus:border-[var(--bd)] transition-colors"
+                className="well-3d w-full rounded-lg pl-8.5 pr-7 py-2 md:py-1.5 text-base md:text-xs text-[var(--tx)] placeholder:text-[var(--mut)] outline-none"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-3 md:top-2.5 text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1672,10 +1756,10 @@ export function ChatWorkspace({
                       onSelectChat(c.id);
                       onSetMobileMenuOpen(false);
                     }}
-                  className={`group relative flex items-center gap-2 px-3 py-2.5 md:py-2 min-h-[44px] md:min-h-0 rounded-xl text-[13.5px] md:text-xs font-medium cursor-pointer transition-colors ${
+                  className={`group relative flex items-center gap-2 px-3 py-2.5 md:py-2 min-h-[42px] md:min-h-0 rounded-lg text-[13.5px] md:text-[13px] font-medium cursor-pointer transition-all border ${
                     isActive
-                      ? 'bg-[var(--card)]/85 text-[var(--tx)] font-semibold'
-                      : 'text-[var(--mut)] hover:bg-[var(--card)]/45 hover:text-[var(--tx)]'
+                      ? 'surface-3d text-[var(--tx)] font-semibold'
+                      : 'border-transparent text-[var(--mut)] hover:bg-[var(--card)]/55 hover:text-[var(--tx)]'
                   }`}
                 >
                   {isEditing ? (
@@ -1770,7 +1854,7 @@ export function ChatWorkspace({
         </div>
 
         {/* User Profile Footer */}
-        <div className="relative pt-2 border-t border-[var(--bd)]">
+        <div ref={profileMenuRef} className="relative pt-2 border-t border-[var(--bd)]">
           <AnimatePresence>
             {profileMenuOpen && (
               <motion.div
@@ -1783,7 +1867,7 @@ export function ChatWorkspace({
               >
                 <div className="px-3 py-2 border-b border-[var(--bd)] space-y-1">
                   <p className="font-medium text-[var(--tx)] truncate">
-                    {user?.displayName || t.common.defaultUser}
+                    {effectiveDisplayName}
                   </p>
                   <p className="text-[11px] text-[var(--mut)] truncate">
                     {user?.email || ''}
@@ -1801,6 +1885,14 @@ export function ChatWorkspace({
                     </div>
                   )}
                 </div>
+
+              <button
+                onClick={() => openSettings('profile')}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-[var(--surf)] text-[var(--tx)] cursor-pointer"
+              >
+                <UserIcon className="w-4 h-4" />
+                <span>{lang === 'tr' ? 'Profil & logo' : 'Profile & logo'}</span>
+              </button>
 
               <button
                 onClick={() => openSettings('commands')}
@@ -1865,14 +1957,24 @@ export function ChatWorkspace({
           <div className="flex items-center gap-1">
             <button
               onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-              className="flex-1 min-w-0 flex items-center gap-3 p-2 rounded-xl hover:bg-[var(--card)]/75 text-left transition-colors cursor-pointer"
+              className="flex-1 min-w-0 flex items-center gap-2.5 p-2 rounded-lg hover:bg-[var(--card)] text-left transition-colors cursor-pointer"
             >
-              <div className="w-7 h-7 rounded-full bg-[var(--ac)] text-[var(--on)] flex items-center justify-center font-semibold text-xs shrink-0">
-                {(user?.displayName || user?.email || 'U')[0].toUpperCase()}
+              <div className="w-7 h-7 rounded-lg bg-[var(--ac)] text-[var(--on)] flex items-center justify-center font-display font-bold text-xs shrink-0 overflow-hidden">
+                {effectivePhotoUrl && !sidebarAvatarFailed ? (
+                  <img
+                    src={effectivePhotoUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    onError={() => setSidebarAvatarFailed(true)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  (effectiveDisplayName || user?.email || 'U')[0].toUpperCase()
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-[var(--tx)] truncate">
-                  {user?.displayName || t.common.defaultUser}
+                <p className="text-xs font-semibold text-[var(--tx)] truncate">
+                  {effectiveDisplayName}
                 </p>
                 <p className="text-[10px] text-[var(--mut)] truncate">
                   {user?.email || 'Firebase Auth'}
@@ -1882,10 +1984,10 @@ export function ChatWorkspace({
             </button>
             <button
               type="button"
-              onClick={() => openSettings('commands')}
-              title={lang === 'tr' ? 'Ayarlar ve /komutlar' : 'Settings & /commands'}
+              onClick={() => openSettings('profile')}
+              title={lang === 'tr' ? 'Ayarlar ve profil' : 'Settings & profile'}
               aria-label={lang === 'tr' ? 'Ayarlar' : 'Settings'}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--card)]/75 transition-colors cursor-pointer shrink-0"
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--card)] transition-colors cursor-pointer shrink-0"
             >
               <Settings className="w-4 h-4" />
             </button>
@@ -1895,13 +1997,13 @@ export function ChatWorkspace({
       </aside>
 
       {/* Main Chat Canvas */}
-      <main className="flex-1 flex flex-col min-w-0 h-full relative">
-        {/* Seamless Top Bar — Zero Hard Box Divider */}
-        <header className="relative z-10 min-h-14 pt-[env(safe-area-inset-top)] px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 bg-[var(--bg)] shrink-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+      <main className="ambient-chat-canvas flex-1 flex flex-col min-w-0 h-full relative">
+        {/* Calm Minimal Top Bar */}
+        <header className="relative z-10 min-h-14 pt-[env(safe-area-inset-top)] px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 bg-[var(--bg)]/72 backdrop-blur-xl border-b border-[var(--bd)]/65 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
             <button
               onClick={() => onSetMobileMenuOpen(true)}
-              className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]/80 transition-colors cursor-pointer shrink-0"
+              className="md:hidden w-9 h-9 flex items-center justify-center rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer shrink-0"
               aria-label={cText.openSidebarAria}
               title={`${cText.sidebarLabel} (${modKey}+B)`}
             >
@@ -1910,7 +2012,7 @@ export function ChatWorkspace({
 
             <button
               onClick={onToggleSidebar}
-              className="hidden md:inline-flex items-center justify-center w-9 h-9 rounded-xl text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]/80 transition-colors cursor-pointer shrink-0"
+              className="hidden md:inline-flex items-center justify-center w-9 h-9 rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer shrink-0"
               aria-label={sidebarOpen ? cText.hideSidebar : cText.showSidebar}
               title={`${sidebarOpen ? cText.hideSidebar : cText.showSidebar} (${modKey}+B)`}
             >
@@ -1921,55 +2023,49 @@ export function ChatWorkspace({
               )}
             </button>
 
-            <h2 className="font-serif-fraunces text-[15px] sm:text-base font-semibold truncate min-w-0 pl-0.5">
+            <h2 className="font-soft text-[15px] font-semibold tracking-tight truncate min-w-0">
               {formatChatTitle(currentChat?.title)}
             </h2>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-4 shrink-0">
-            {/* Clean Unboxed Depth Switch */}
-            <div className="flex items-center gap-1 sm:gap-4 text-xs">
-              <button
-                onClick={() => setDepth('fast')}
-                className={`flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:py-1.5 font-medium transition-colors cursor-pointer border-b-2 ${
-                  depth === 'fast'
-                    ? 'text-[var(--tx)] border-[var(--tx)] font-semibold'
-                    : 'text-[var(--mut)] border-transparent hover:text-[var(--tx)]'
-                }`}
-                title={cText.depthFastTitle}
-                aria-label={cText.depthFast}
-              >
-                <FastDepthIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{cText.depthFast}</span>
-              </button>
-
-              <button
-                onClick={() => setDepth('mid')}
-                className={`flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:py-1.5 font-medium transition-colors cursor-pointer border-b-2 ${
-                  depth === 'mid'
-                    ? 'text-[var(--tx)] border-[var(--tx)] font-semibold'
-                    : 'text-[var(--mut)] border-transparent hover:text-[var(--tx)]'
-                }`}
-                title={cText.depthMidTitle}
-                aria-label={cText.depthMid}
-              >
-                <BalancedDepthIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{cText.depthMid}</span>
-              </button>
-
-              <button
-                onClick={() => setDepth('deep')}
-                className={`flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:py-1.5 font-medium transition-colors cursor-pointer border-b-2 ${
-                  depth === 'deep'
-                    ? 'text-[var(--tx)] border-[var(--tx)] font-semibold'
-                    : 'text-[var(--mut)] border-transparent hover:text-[var(--tx)]'
-                }`}
-                title={cText.depthDeepTitle}
-                aria-label={cText.depthDeep}
-              >
-                <DeepDepthIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{cText.depthDeep}</span>
-              </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Calm Pill Segmented Reasoning Depth Switch */}
+            <div className="segmented-track-3d flex items-center gap-0.5 p-1 rounded-full text-xs">
+              {(
+                [
+                  { id: 'fast', label: cText.depthFast, title: cText.depthFastTitle, Icon: FastDepthIcon },
+                  { id: 'mid', label: cText.depthMid, title: cText.depthMidTitle, Icon: BalancedDepthIcon },
+                  { id: 'deep', label: cText.depthDeep, title: cText.depthDeepTitle, Icon: DeepDepthIcon },
+                ] as const
+              ).map(({ id, label, title, Icon }) => {
+                const active = depth === id;
+                return (
+                  <motion.button
+                    key={id}
+                    whileTap={{ scale: 0.94 }}
+                    transition={LIQUID_TAP}
+                    onClick={() => setDepth(id)}
+                    className={`relative flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                      active
+                        ? 'text-[var(--tx)] font-semibold'
+                        : 'text-[var(--mut)] hover:text-[var(--tx)]'
+                    }`}
+                    title={title}
+                    aria-label={label}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="workspace-depth-pill"
+                        transition={LIQUID_MORPH}
+                        className="segmented-thumb-3d absolute inset-0 rounded-full"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <Icon className="relative z-10 w-3.5 h-3.5" />
+                    <span className="relative z-10 hidden sm:inline">{label}</span>
+                  </motion.button>
+                );
+              })}
             </div>
           </div>
         </header>
@@ -2028,15 +2124,20 @@ export function ChatWorkspace({
         )}
 
         {/* Scrollable Messages Thread */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3.5 pt-5 pb-6 sm:px-8 sm:py-8 flex flex-col">
+        <div
+          ref={messagesScrollRef}
+          onScroll={handleMessagesScroll}
+          className="flex-1 overflow-y-auto overflow-x-hidden px-3.5 pt-5 pb-6 sm:px-8 sm:py-8 flex flex-col"
+        >
           <div className="w-full max-w-[46rem] mx-auto space-y-5 sm:space-y-7 min-w-0 flex-1 flex flex-col">
             {(!currentChat?.messages || currentChat.messages.length === 0) &&
               (() => {
                 const ew = cText.emptyWorkspace;
                 const hour = new Date().getHours();
-                const firstName = user?.displayName
-                  ? user.displayName.split(' ')[0]
-                  : cText.defaultFriendName;
+                const firstName =
+                  effectiveDisplayName && effectiveDisplayName !== t.common.defaultUser
+                    ? effectiveDisplayName.split(' ')[0]
+                    : cText.defaultFriendName;
                 const greeting =
                   hour < 12
                     ? ew.greetingMorning(firstName)
@@ -2046,20 +2147,34 @@ export function ChatWorkspace({
                 const quickPrompts = cText.suggestions.slice(0, 3);
 
                 return (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center py-10 px-2 space-y-7 animate-up">
-                    <div className="space-y-3">
-                      <LongclawLogo className="w-9 h-9 text-[var(--tx)] mx-auto" />
-                      <h3 className="font-serif-fraunces text-[1.9rem] sm:text-[2.4rem] font-semibold tracking-tight leading-[1.15] text-balance text-[var(--tx)]">
+                  <div className="flex-1 flex flex-col justify-center py-8 px-1 space-y-8 animate-up max-w-2xl mx-auto w-full text-center">
+                    <div className="space-y-3 flex flex-col items-center">
+                      <LongclawLogo className="w-[39px] h-[39px] text-[var(--tx)]" />
+                      <h3 className="font-serif-fraunces text-[1.95rem] sm:text-[2.45rem] font-medium tracking-[-0.02em] leading-[1.12] text-balance text-[var(--tx)]">
                         {greeting}
                       </h3>
+                      <div className="flex items-center justify-center gap-2 text-xs text-[var(--mut)]">
+                        <ModelLogo modelId={selectedModel} className="w-[17px] h-[17px] shrink-0" />
+                        <span className="font-medium text-[var(--tx)]">{activeModel.name}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{t.models[selectedModel].tagline}</span>
+                      </div>
                     </div>
 
-                    {/* Clean Unboxed Prompt Suggestions */}
-                    <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-x-6 gap-y-2.5 max-w-2xl">
+                    {/* Calm Starter Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
                       {quickPrompts.map((prompt, i) => (
-                        <button
+                        <motion.button
                           key={i}
                           type="button"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          whileTap={{ scale: 0.985 }}
+                          transition={{
+                            duration: 0.28,
+                            delay: 0.04 + i * 0.045,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
                           onClick={() => {
                             if (prompt.endsWith(':')) {
                               setInputMessage(prompt + ' ');
@@ -2068,11 +2183,13 @@ export function ChatWorkspace({
                               handleSendMessage(prompt);
                             }
                           }}
-                          className="group inline-flex items-center gap-1.5 py-1 text-[13px] text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer"
+                          className="tile-3d group p-4 rounded-2xl text-left flex flex-col justify-between gap-4 min-h-[104px] cursor-pointer"
                         >
-                          <span>{prompt}</span>
-                          <ArrowUpRight className="w-3.5 h-3.5 opacity-45 group-hover:opacity-100 transition-opacity shrink-0" />
-                        </button>
+                          <span className="text-[13.5px] font-medium text-[var(--tx)] leading-snug">
+                            {prompt}
+                          </span>
+                          <ArrowUpRight className="w-4 h-4 text-[var(--mut)] group-hover:text-[var(--tx)] transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 shrink-0 self-end" />
+                        </motion.button>
                       ))}
                     </div>
                   </div>
@@ -2083,10 +2200,10 @@ export function ChatWorkspace({
             {currentChat?.messages?.map((msg, idx) => (
               <div
                 key={msg.id || idx}
-                className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                className={`animate-pop flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 {msg.role === 'user' ? (
-                  <div className="max-w-[86%] sm:max-w-[80%] flex flex-col items-end gap-2">
+                  <div className="max-w-[86%] sm:max-w-[78%] flex flex-col items-end gap-2">
                     {msg.images && msg.images.length > 0 && (
                       <div
                         className={`grid gap-2 ${
@@ -2098,7 +2215,7 @@ export function ChatWorkspace({
                             key={img.id}
                             type="button"
                             onClick={() => setLightboxImageSrc(img.dataUrl)}
-                            className="photo-frame-3d overflow-hidden rounded-2xl bg-[var(--surf)] cursor-zoom-in block"
+                            className="photo-frame-3d overflow-hidden rounded-xl bg-[var(--surf)] cursor-zoom-in block"
                           >
                             <img
                               src={img.dataUrl}
@@ -2110,13 +2227,13 @@ export function ChatWorkspace({
                       </div>
                     )}
                     {msg.content && (
-                      <div className="bubble-3d-user px-4.5 py-3.5 sm:px-4.5 sm:py-3 rounded-[22px] rounded-br-md text-[15px] sm:text-[14.5px] leading-[1.65] whitespace-pre-wrap break-words">
+                      <div className="bubble-3d-user px-4.5 py-3 rounded-3xl rounded-br-md text-[15px] sm:text-[14.5px] leading-[1.65] whitespace-pre-wrap break-words">
                         {(() => {
                           const cmdMatch = msg.content.match(/^(\/[\p{L}\p{N}_-]+)([\s\S]*)$/u);
                           if (!cmdMatch) return msg.content;
                           return (
                             <>
-                              <span className="font-mono font-semibold text-[var(--tx)]">
+                              <span className="font-mono font-semibold text-[var(--on)] underline underline-offset-4 decoration-current/45">
                                 {cmdMatch[1]}
                               </span>
                               {cmdMatch[2]}
@@ -2127,13 +2244,13 @@ export function ChatWorkspace({
                     )}
                   </div>
                 ) : (
-                  <div className="w-full flex gap-3 sm:gap-3.5 items-start animate-pop">
-                    <div className="shrink-0 mt-1 text-[var(--tx)]">
-                      <LongclawLogo className="w-5 h-5" />
+                  <div className="w-full flex gap-3.5 items-start animate-pop">
+                    <div className="w-8 h-8 rounded-full bg-[var(--surf)] border border-[var(--bd)] flex items-center justify-center shrink-0 mt-0.5 text-[var(--tx)]">
+                      <LongclawLogo className="w-[17px] h-[17px]" />
                     </div>
 
-                    <div className="flex-1 min-w-0 space-y-3 sm:space-y-3">
-                      {/* Thought block — Quiet Unboxed Disclosure */}
+                    <div className="flex-1 min-w-0 space-y-3">
+                      {/* Thought block — Tactile 3D Disclosure */}
                       {msg.thoughts && (
                         <div className="text-xs">
                           <button
@@ -2143,9 +2260,9 @@ export function ChatWorkspace({
                                 [msg.id]: !prev[msg.id],
                               }))
                             }
-                            className="inline-flex items-center gap-2 py-1.5 text-[var(--mut)] hover:text-[var(--tx)] transition-colors cursor-pointer"
+                            className="btn-3d-soft inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer"
                           >
-                            <ReasoningIcon className="w-3.5 h-3.5 text-[var(--tx)] shrink-0" />
+                            <ReasoningIcon className="w-3.5 h-3.5 text-[var(--ac)] shrink-0" />
                             <span className="font-medium">
                               {cText.thoughtsLabel}{' '}
                               {msg.dur ? `· ${msg.dur} ${cText.secondsShort}` : ''}
@@ -2166,7 +2283,7 @@ export function ChatWorkspace({
                                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                                 className="overflow-hidden"
                               >
-                                <div className="mt-1.5 ml-1.5 pl-3.5 border-l border-[var(--bd)] text-[13px] text-[var(--mut)] whitespace-pre-line leading-relaxed">
+                                <div className="well-3d mt-2 p-3.5 rounded-xl text-[13px] text-[var(--mut)] whitespace-pre-line leading-relaxed">
                                   {msg.thoughts}
                                 </div>
                               </motion.div>
@@ -2331,7 +2448,7 @@ export function ChatWorkspace({
                                 className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-[var(--mut)]/90 select-none sm:ml-auto"
                                 title={getChatModelOption(msg.modelId).name}
                               >
-                                <ModelLogo modelId={msg.modelId} className="w-3 h-3 shrink-0" />
+                                <ModelLogo modelId={msg.modelId} className="w-[15px] h-[15px] shrink-0" />
                                 <span>{getChatModelOption(msg.modelId).shortName}</span>
                               </span>
                             )}
@@ -2346,19 +2463,19 @@ export function ChatWorkspace({
 
             {/* Live Streaming Bubble */}
             {isStreaming && (
-              <div className="w-full flex gap-3 sm:gap-3.5 items-start animate-pop">
-                <div className="shrink-0 mt-1 text-[var(--tx)]">
-                  <LongclawLogo className="w-5 h-5" />
+              <div className="w-full flex gap-3.5 items-start animate-pop">
+                <div className="w-8 h-8 rounded-full bg-[var(--surf)] border border-[var(--bd)] flex items-center justify-center shrink-0 mt-0.5 text-[var(--tx)]">
+                  <LongclawLogo className="w-[17px] h-[17px]" />
                 </div>
 
                 <div className="flex-1 min-w-0 space-y-2.5">
                   {streamingThoughts && (
                     <div className="text-xs text-[var(--mut)] space-y-1.5">
                       <div className="flex items-center gap-1.5 font-medium py-0.5">
-                        <ReasoningIcon className="w-3.5 h-3.5 text-[var(--tx)] shrink-0" />
+                        <ReasoningIcon className="w-3.5 h-3.5 text-[var(--ac)] shrink-0" />
                         <span className="animate-shimmer">{cText.thinking}</span>
                       </div>
-                      <p className="ml-1.5 pl-3.5 border-l border-[var(--bd)] text-[13px] whitespace-pre-line leading-relaxed">
+                      <p className="well-3d p-3 rounded-xl text-[13px] whitespace-pre-line leading-relaxed">
                         {streamingThoughts}
                       </p>
                     </div>
@@ -2418,6 +2535,25 @@ export function ChatWorkspace({
         {/* Bottom Sculpted 3D Composer (zero elements beneath typing bar) */}
         <div className="relative z-10 px-3 pt-1.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-2 sm:pb-6 bg-transparent shrink-0">
           <div className="max-w-[46rem] mx-auto relative">
+            {/* Subtle Floating Scroll-to-Bottom Button */}
+            <AnimatePresence>
+              {showScrollToBottom && !slashMenuOpen && (
+                <motion.button
+                  type="button"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  onClick={() => scrollToBottom('smooth')}
+                  aria-label={lang === 'tr' ? 'En alta kaydır' : 'Scroll to bottom'}
+                  title={lang === 'tr' ? 'En alta kaydır' : 'Scroll to bottom'}
+                  className="surface-3d-elevated absolute -top-11 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full flex items-center justify-center text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer z-30"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+
             {/* Slash Command Autocomplete Popover */}
             <AnimatePresence>
               {slashMenuOpen && (
@@ -2499,7 +2635,7 @@ export function ChatWorkspace({
               )}
             </AnimatePresence>
 
-            {/* Unified Tactile 3D Typing Bar */}
+            {/* Sculpted 3D Floating Command Composer Dock */}
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -2517,8 +2653,8 @@ export function ChatWorkspace({
                   void processIncomingFiles(e.dataTransfer.files);
                 }
               }}
-              className={`bg-[var(--surf)]/85 border border-[var(--bd)]/75 relative rounded-3xl px-3.5 pt-3 pb-2.5 sm:px-4.5 sm:pt-3.5 sm:pb-3 transition-all ${
-                isDraggingFiles ? 'ring-2 ring-[var(--tx)]/25' : ''
+              className={`composer-3d relative rounded-3xl px-4 pt-3.5 pb-2.5 sm:px-4.5 sm:pt-4 sm:pb-3 ${
+                isDraggingFiles ? 'ring-2 ring-[var(--tx)]/20 border-[var(--tx)]' : ''
               }`}
             >
               <input
@@ -2659,13 +2795,13 @@ export function ChatWorkspace({
                 className="w-full bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none appearance-none resize-none px-1 pb-2 text-base sm:text-sm leading-relaxed text-[var(--tx)] placeholder:text-[var(--mut)] max-h-40 sm:max-h-44 min-h-[42px] sm:min-h-[38px]"
               />
 
-              <div className="flex items-center justify-between gap-2 pt-1.5">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--bd)]/65 mt-1">
                 <div className="flex items-center gap-1 min-w-0 flex-1">
                   {/* Attach File */}
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]/85 transition-colors cursor-pointer shrink-0"
+                    className="w-9.5 h-9.5 sm:w-8.5 sm:h-8.5 flex items-center justify-center rounded-lg text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer shrink-0"
                     title={cText.attachFileTitle}
                     aria-label={cText.attachFileTitle}
                   >
@@ -2676,7 +2812,7 @@ export function ChatWorkspace({
                   <button
                     type="button"
                     onClick={() => openConnectors('gmail')}
-                    className="relative w-9 h-9 flex items-center justify-center rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]/85 transition-colors cursor-pointer shrink-0"
+                    className="relative w-9.5 h-9.5 sm:w-8.5 sm:h-8.5 flex items-center justify-center rounded-lg text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer shrink-0"
                     title={cText.connectors.openButtonTitle}
                     aria-label={cText.connectors.openButtonTitle}
                   >
@@ -2693,10 +2829,10 @@ export function ChatWorkspace({
                       setImageMode((prev) => !prev);
                       textareaRef.current?.focus();
                     }}
-                    className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer shrink-0 ${
+                    className={`w-9.5 h-9.5 sm:w-8.5 sm:h-8.5 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
                       imageMode
-                        ? 'bg-[var(--tx)] text-[var(--bg)]'
-                        : 'text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]/85'
+                        ? 'bg-[var(--ac)] text-[var(--on)]'
+                        : 'text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]'
                     }`}
                     title={lang === 'tr' ? 'Görsel oluştur' : 'Create image'}
                     aria-label={lang === 'tr' ? 'Görsel oluştur' : 'Create image'}
@@ -2706,16 +2842,16 @@ export function ChatWorkspace({
                   </button>
 
                   {/* Model Selector inside Typing Bar */}
-                  <div ref={modelMenuRef} className="relative min-w-0 max-w-full ml-0.5">
+                  <div ref={modelMenuRef} className="relative min-w-0 max-w-full ml-1">
                     <button
                       type="button"
                       onClick={() => setModelMenuOpen((prev) => !prev)}
                       aria-expanded={modelMenuOpen}
                       aria-haspopup="listbox"
-                      className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 min-h-[36px] max-w-full rounded-full text-xs font-medium text-[var(--tx)] hover:bg-[var(--surf)]/85 transition-colors cursor-pointer"
+                      className="btn-3d-soft flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 min-h-[34px] max-w-full rounded-lg text-xs font-medium cursor-pointer"
                       title={cText.selectModelTitle}
                     >
-                      <ModelLogo modelId={selectedModel} className="w-4 h-4 shrink-0" />
+                      <ModelLogo modelId={selectedModel} className="w-[19px] h-[19px] shrink-0" />
                       <span className="hidden sm:inline truncate">{activeModel.name}</span>
                       <span className="sm:hidden truncate">{activeModel.shortName}</span>
                       <ChevronUp
@@ -2758,7 +2894,7 @@ export function ChatWorkspace({
                                     : 'hover:bg-[var(--surf)]/55 text-[var(--tx)]'
                                 }`}
                               >
-                                <ModelLogo modelId={m.id} className="w-4.5 h-4.5 shrink-0 mt-0.5" />
+                                <ModelLogo modelId={m.id} className="w-[22px] h-[22px] shrink-0 mt-0.5" />
                                 <div className="flex-1 min-w-0">
                                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs font-semibold text-[var(--tx)]">
                                     <span>{m.shortName}</span>
@@ -2812,7 +2948,7 @@ export function ChatWorkspace({
                                           : 'hover:bg-[var(--surf)]/55 text-[var(--tx)]'
                                       }`}
                                     >
-                                      <ModelLogo modelId={m.id} className="w-4.5 h-4.5 shrink-0 mt-0.5" />
+                                      <ModelLogo modelId={m.id} className="w-[22px] h-[22px] shrink-0 mt-0.5" />
                                       <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs font-semibold text-[var(--tx)]">
                                           <span>{m.shortName}</span>
@@ -2842,7 +2978,7 @@ export function ChatWorkspace({
                   <button
                     type="button"
                     onClick={handleStopStreaming}
-                    className="w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-[var(--tx)] text-[var(--bg)] hover:opacity-85 flex items-center justify-center shrink-0 transition-opacity cursor-pointer"
+                    className="w-9 h-9 rounded-full bg-[var(--tx)] text-[var(--bg)] hover:opacity-85 flex items-center justify-center shrink-0 transition-opacity cursor-pointer"
                     title={cText.stopTitle}
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
@@ -2852,7 +2988,7 @@ export function ChatWorkspace({
                     type="button"
                     onClick={() => handleSendMessage()}
                     disabled={!inputMessage.trim() && attachedImages.length === 0}
-                    className="btn-3d-primary w-10 h-10 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+                    className="btn-3d-primary w-9 h-9 rounded-full flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
                     title={cText.sendTitle}
                   >
                     <ArrowUp className="w-4 h-4 stroke-[2.2]" />
@@ -2945,6 +3081,7 @@ export function ChatWorkspace({
         user={user}
         lang={lang}
         theme={theme}
+        fontPref={fontPref}
         customCommands={customCommands}
         workspaceConnected={workspaceConnected}
         workspaceEmail={workspaceEmail}
@@ -2952,7 +3089,9 @@ export function ChatWorkspace({
         onDeleteCommand={handleDeleteCustomCommand}
         onToggleTheme={onToggleTheme}
         onChangeLang={onChangeLang}
+        onChangeFontPref={onChangeFontPref}
         onOpenConnectors={() => openConnectors('gmail')}
+        onProfileUpdated={() => setUserVersion((v) => v + 1)}
         onClose={() => setSettingsOpen(false)}
       />
 

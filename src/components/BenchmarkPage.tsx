@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, ArrowUpDown, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { LIQUID_BAR, LIQUID_MORPH, LIQUID_SPRING } from '../lib/motion';
 import { ModelLogo, BenchmarkModelLogo } from './Icons';
 import { ChatModelId } from '../lib/models';
 import { Language, TRANSLATIONS } from '../lib/i18n';
@@ -515,14 +516,14 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
   ];
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] canvas-tactile text-[var(--tx)]">
-      {/* Header & Sculpted Highlights */}
-      <section className="pt-8 sm:pt-16 pb-10 sm:pb-20 border-b border-[var(--bd)]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+    <div className="min-h-[calc(100vh-4rem)] bg-[var(--bg)] text-[var(--tx)]">
+      {/* Header & Architectural Highlights */}
+      <section className="pt-8 sm:pt-14 pb-10 sm:pb-16 border-b border-[var(--bd)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-[var(--mut)] hover:text-[var(--tx)] transition-colors mb-6 sm:mb-10 py-1.5 cursor-pointer"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-[var(--mut)] hover:text-[var(--tx)] transition-colors mb-6 sm:mb-8 py-1.5 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>{b.backToHome}</span>
@@ -533,7 +534,7 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
               <p className="text-xs font-medium text-[var(--mut)] mb-2.5">
                 {b.eyebrow}
               </p>
-              <h1 className="font-serif-fraunces text-[1.9rem] sm:text-5xl font-medium tracking-tight leading-[1.08] text-balance">
+              <h1 className="font-serif-fraunces text-[2rem] sm:text-5xl font-medium tracking-[-0.025em] leading-[1.08] text-balance">
                 {b.title}
               </h1>
               <p className="mt-3.5 sm:mt-4 text-[15px] sm:text-base text-[var(--mut)] leading-[1.7]">
@@ -544,25 +545,25 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
             <button
               type="button"
               onClick={() => onOpenAuth('up')}
-              className="btn-3d-primary w-full sm:w-auto px-6 py-3 rounded-full text-sm font-semibold inline-flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
+              className="btn-3d-primary w-full sm:w-auto px-6 py-3 rounded-full text-sm font-medium inline-flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
             >
               <span>{b.testYourself}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
-          {/* 4 Open Hairline Model Highlights */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 sm:gap-x-8 mt-10 sm:mt-16 pt-8 sm:pt-10 border-t border-[var(--bd)]">
+          {/* 4 Editorial Highlight Slabs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10 sm:mt-14">
             {highlights.map((item) => (
-              <div key={item.id} className="space-y-2">
+              <div key={item.id} className="surface-3d rounded-2xl p-5 sm:p-6 space-y-2.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <ModelLogo modelId={item.id} className="w-4 h-4 shrink-0" />
-                  <span className="text-xs sm:text-sm font-semibold text-[var(--tx)] truncate">
+                  <ModelLogo modelId={item.id} className="w-[22px] h-[22px] shrink-0" />
+                  <span className="text-xs sm:text-sm font-soft font-semibold text-[var(--tx)] truncate">
                     {item.name}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-0.5">
-                  <span className="font-serif-fraunces text-2xl sm:text-[1.75rem] font-medium tracking-tight tabular-nums text-[var(--tx)]">
+                  <span className="font-mono text-2xl sm:text-[1.7rem] font-semibold tracking-tight tabular-nums text-[var(--tx)]">
                     {item.stat}
                   </span>
                   <span className="text-[11px] sm:text-xs text-[var(--mut)]">{item.statLabel}</span>
@@ -575,9 +576,9 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
       </section>
 
       {/* Interactive Spotlight Benchmark Explorer */}
-      <section className="py-10 sm:py-24">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          {/* Category Underline Tabs + Model Density Switch */}
+      <section className="py-10 sm:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8">
+          {/* Category Tabs + Model Density Switch */}
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 border-b border-[var(--bd)] pb-0">
             <div className="flex items-center gap-6 sm:gap-7 overflow-x-auto no-scrollbar -mb-[1px]">
               {CATEGORY_TAB_IDS.map((tabId) => {
@@ -589,7 +590,7 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
                     onClick={() => handleCategoryChange(tabId)}
                     className={`relative pb-3.5 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                       active
-                        ? 'text-[var(--tx)]'
+                        ? 'text-[var(--ac)] font-semibold'
                         : 'text-[var(--mut)] hover:text-[var(--tx)]'
                     }`}
                   >
@@ -597,8 +598,8 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
                     {active && (
                       <motion.span
                         layoutId="benchCategoryUnderline"
-                        transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                        className="absolute inset-x-0 bottom-0 h-[2px] bg-[var(--tx)]"
+                        transition={LIQUID_MORPH}
+                        className="absolute inset-x-0 bottom-0 h-[2px] bg-[var(--ac)]"
                       />
                     )}
                   </button>
@@ -660,7 +661,7 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
           <div className="mt-7 lg:mt-12 grid grid-cols-1 lg:grid-cols-[270px_1fr] gap-8 lg:gap-14 items-start">
             {/* Desktop Left: Benchmark Index List */}
             <div className="hidden lg:block">
-              <p className="text-[11px] font-medium text-[var(--mut)] uppercase tracking-wider mb-3">
+              <p className="text-xs font-medium text-[var(--mut)] mb-3">
                 {ui.selectBenchmark}
               </p>
               <div className="divide-y divide-[var(--bd)] border-y border-[var(--bd)]">
@@ -713,10 +714,10 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
             <AnimatePresence mode="wait">
               <motion.div
                 key={`${activeBench.id}-${showAllModels}`}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.24, ease: EASE_EDITORIAL }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 className="min-w-0"
               >
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-6 border-b border-[var(--bd)]">
@@ -732,11 +733,11 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
                   {/* Clean Legend */}
                   <div className="flex items-center gap-4 text-xs text-[var(--mut)] shrink-0">
                     <span className="inline-flex items-center gap-2">
-                      <span className="w-3 h-1.5 rounded-full bg-[var(--tx)] inline-block" />
+                      <span className="w-3 h-1.5 rounded-sm bg-[var(--ac)] inline-block" />
                       <span>{b.legendLongclaw}</span>
                     </span>
                     <span className="inline-flex items-center gap-2">
-                      <span className="w-3 h-1.5 rounded-full bg-[var(--bd)] inline-block" />
+                      <span className="w-3 h-1.5 rounded-sm bg-[var(--bd)] inline-block" />
                       <span>{b.legendOthers}</span>
                     </span>
                   </div>
@@ -768,7 +769,7 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
                             <BenchmarkModelLogo
                               provider={entry.provider}
                               modelId={entry.modelId}
-                              className="w-4 h-4 shrink-0"
+                              className="w-[19px] h-[19px] shrink-0"
                             />
                             <span
                               className={`text-sm truncate ${
@@ -788,7 +789,7 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
 
                           <div className="flex items-center gap-2.5 shrink-0">
                             {isLeader && (
-                              <span className="text-[11px] font-medium text-[var(--mut)]">
+                              <span className="text-[11px] font-mono font-medium text-[var(--ac)]">
                                 {ui.leaderLabel}
                               </span>
                             )}
@@ -806,17 +807,16 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
                         </div>
 
                         <div className="pl-8">
-                          <div className="w-full h-2 rounded-full bg-[var(--surf)] overflow-hidden">
+                          <div className="bar-3d-track w-full h-2.5 rounded-full overflow-hidden">
                             <motion.div
                               initial={{ scaleX: 0 }}
                               animate={{ scaleX: pct / 100 }}
                               transition={{
-                                duration: 0.45,
-                                delay: idx * 0.03,
-                                ease: EASE_EDITORIAL,
+                                ...LIQUID_BAR,
+                                delay: idx * 0.032,
                               }}
                               className={`h-full w-full rounded-full origin-left ${
-                                entry.isLongclaw ? 'bg-[var(--tx)]' : 'bg-[var(--bd)]'
+                                entry.isLongclaw ? 'bar-3d-cobalt' : 'bar-3d-neutral'
                               }`}
                             />
                           </div>
@@ -835,9 +835,9 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
         </div>
       </section>
 
-      {/* Clean, Sortable Full Comparison Matrix — Open Editorial Table */}
-      <section className="py-10 sm:py-24 border-t border-[var(--bd)]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-6 sm:space-y-8">
+      {/* Clean, Sortable Full Comparison Matrix — Architectural Table */}
+      <section className="py-10 sm:py-20 bg-[var(--surf)]/55 border-t border-[var(--bd)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-6 sm:space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div>
               <h2 className="font-serif-fraunces text-2xl sm:text-3xl font-medium tracking-tight">
@@ -896,7 +896,7 @@ export function BenchmarkPage({ lang, onBack, onOpenAuth }: BenchmarkPageProps) 
                         <BenchmarkModelLogo
                           provider={row.provider}
                           modelId={row.modelId}
-                          className="w-4 h-4 shrink-0"
+                          className="w-[19px] h-[19px] shrink-0"
                         />
                         <span
                           className={

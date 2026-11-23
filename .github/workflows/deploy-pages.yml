@@ -3,7 +3,7 @@ name: Deploy Longclaw to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "master"]
   workflow_dispatch:
 
 permissions:
@@ -29,18 +29,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Build production site
+      - name: Build production site for GitHub Pages
         env:
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
         run: npm run build
 
-      - name: Add SPA fallback and disable Jekyll
+      - name: Add SPA 404 fallback and disable Jekyll
         run: |
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
@@ -59,4 +59,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4

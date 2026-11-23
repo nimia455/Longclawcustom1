@@ -135,7 +135,14 @@ export interface Translations {
   auth: {
     titleForgot: string;
     titleDefault: string;
+    titleSignIn: string;
+    titleSignUp: string;
     subtitle: string;
+    subtitleSignIn: string;
+    subtitleSignUp: string;
+    showPassword: string;
+    hidePassword: string;
+    passwordMinHint: string;
     backToSignIn: string;
     forgotDesc: string;
     emailPlaceholder: string;
@@ -465,7 +472,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         codingDesc: 'HTML, arayüz ve görselleri sohbetin hemen yanında test et.',
         codingAlt: 'Canlı kod geliştirme görünümü',
       },
-      heroImageAlt: 'Sabah ışığında sakin okyanus dalgaları ve geniş kumsal sahili',
+      heroImageAlt: 'Gün doğumunda sakin Alp dağları ve sisli ufuk manzarası',
       depthsImageAlt: 'Üç farklı derinlik düzeyini simgeleyen minimalist optik cam prizmalar',
       heroThinkingBadge: 'Longclaw',
       timelineTitle: '/ yaz, doğrudan yap.',
@@ -594,7 +601,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         math: 'Matematik & Mantık',
         speed: 'Hız & Uyum',
       },
-      legendLongclaw: 'LongClaw modelleri',
+      legendLongclaw: 'Longclaw modelleri',
       legendOthers: 'Diğer modeller',
       cards: {
         'tr-bench': {
@@ -653,13 +660,20 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       colSpeed: 'Hız',
       speedUnit: 'tok/s',
       methodologyNote:
-        'Not: LongClaw skorları Orta/Derin düşünme eforu ayarında, rakip modeller ise kamuya açık standart API sürümleriyle aynı test protokolünde ölçülmüştür.',
+        'Not: Longclaw skorları Orta/Derin düşünme eforu ayarında, rakip modeller ise kamuya açık standart API sürümleriyle aynı test protokolünde ölçülmüştür.',
       startChatting: 'Sohbete başla',
     },
     auth: {
       titleForgot: 'Şifre Yenileme',
       titleDefault: 'Longclaw’a Hoş Geldin',
+      titleSignIn: 'Tekrar Hoş Geldin',
+      titleSignUp: 'Hesabını Oluştur',
       subtitle: 'Kaldığın yerden devam et veya yeni bir hesap aç',
+      subtitleSignIn: 'Sohbetlerine kaldığın yerden devam et',
+      subtitleSignUp: 'Saniyeler içinde sakin çalışma alanını aç',
+      showPassword: 'Şifreyi göster',
+      hidePassword: 'Şifreyi gizle',
+      passwordMinHint: 'En az 6 karakter',
       backToSignIn: 'Giriş ekranına dön',
       forgotDesc:
         'Hesabında kullandığın e-posta adresini yaz. Şifreni güvenle yenileyebilmen için bir doğrulama bağlantısı göndereceğiz.',
@@ -894,8 +908,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       backToLandingTitle: 'Tanıtım sayfasına dön',
       closeMenuAria: 'Menüyü kapat',
       newChatTitle: 'Yeni sohbet',
-      searchPlaceholder: 'Sohbetlerde ara (/)',
-      searchTitle: 'Sohbetlerde ara',
+      searchPlaceholder: 'Sohbetlerde ara',
+      searchTitle: 'Sohbetlerde ara (Ctrl/⌘+Shift+F)',
       noResults: 'Sonuç bulunamadı',
       noChatsYet: 'Henüz sohbet yok',
       unpinTitle: 'Sabitlemeyi kaldır',
@@ -979,7 +993,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       connectors: {
         title: 'Bağlayıcılar',
         subtitle: 'İzninle harici araçlarını bağla; Longclaw gerçek verilerinle çalışsın.',
-        openButtonTitle: 'Bağlayıcılar (Gmail)',
+        openButtonTitle: 'Google Workspace Bağlayıcıları',
         gmailName: 'Gmail',
         gmailDesc: 'Gelen kutunu ara, e-postalarını özetle ve onayınla taslak oluşturup gönder.',
         connectedAs: (email) => `${email} bağlı`,
@@ -1097,7 +1111,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
           a: 'Ready in the live preview panel — start, pause, or reset directly beside the chat.',
         },
         {
-          q: '/takvim Add a team call tomorrow at 10:00',
+          q: '/calendar Add a team call tomorrow at 10:00',
           a: 'Added "Team Call" to your calendar for tomorrow, 10:00–11:00.',
         },
       ],
@@ -1118,7 +1132,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         codingDesc: 'Preview HTML, apps, and visuals right next to your conversation.',
         codingAlt: 'Live code development and split preview workspace',
       },
-      heroImageAlt: 'Calm coastal beach with gentle ocean waves and pale morning sand',
+      heroImageAlt: 'Calm sunlit alpine ridge and serene dawn horizon',
       depthsImageAlt: 'Three minimalist optical glass blocks representing fast, balanced, and deep reasoning',
       heroThinkingBadge: 'Longclaw',
       timelineTitle: 'Type / and get it done.',
@@ -1130,9 +1144,9 @@ export const TRANSLATIONS: Record<Language, Translations> = {
           answer: 'Sent from your Gmail account.',
         },
         {
-          time: '/takvim',
+          time: '/calendar',
           title: 'Add events',
-          prompt: '/takvim Lunch with Alex Friday at 13:00',
+          prompt: '/calendar Lunch with Alex Friday at 13:00',
           answer: 'Added to Google Calendar.',
         },
         {
@@ -1142,15 +1156,15 @@ export const TRANSLATIONS: Record<Language, Translations> = {
           answer: 'Found and opened your file from Google Drive.',
         },
         {
-          time: '/döküman',
+          time: '/docs',
           title: 'Create docs',
-          prompt: '/döküman Write a launch checklist',
+          prompt: '/docs Write a launch checklist',
           answer: 'Created a new Google Doc with your checklist.',
         },
         {
-          time: '/görev',
+          time: '/tasks',
           title: 'Save tasks',
-          prompt: '/görev Renew domain before Monday',
+          prompt: '/tasks Renew domain before Monday',
           answer: 'Saved to Google Tasks.',
         },
       ],
@@ -1181,7 +1195,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       checklistItems: [
         'Google, Apple, and email sign-in',
         'Synced across desktop and mobile',
-        'Direct /gmail, /takvim, /drive, /döküman, and /görev commands',
+        'Direct /gmail, /calendar, /drive, /docs, and /tasks commands',
         'Custom /commands in Settings',
         'Fast, Balanced, and Deep modes',
         'Live code preview panel',
@@ -1202,7 +1216,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         },
         {
           q: 'How do Google commands work?',
-          a: 'Connect your Google account in Connectors, then type /gmail, /takvim, /drive, /döküman, or /görev in chat.',
+          a: 'Connect your Google account in Connectors, then type /gmail, /calendar, /drive, /docs, or /tasks in chat.',
         },
         {
           q: 'Can I add my own commands?',
@@ -1247,7 +1261,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         math: 'Math & Reasoning',
         speed: 'Speed & Compliance',
       },
-      legendLongclaw: 'LongClaw models',
+      legendLongclaw: 'Longclaw models',
       legendOthers: 'Other models',
       cards: {
         'tr-bench': {
@@ -1306,13 +1320,20 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       colSpeed: 'Speed',
       speedUnit: 'tok/s',
       methodologyNote:
-        'Note: LongClaw scores were measured at Balanced/Deep thinking effort, and competing models were evaluated under the same test protocol using publicly available standard API versions.',
+        'Note: Longclaw scores were measured at Balanced/Deep thinking effort, and competing models were evaluated under the same test protocol using publicly available standard API versions.',
       startChatting: 'Start chatting',
     },
     auth: {
       titleForgot: 'Reset Your Password',
       titleDefault: 'Welcome to Longclaw',
+      titleSignIn: 'Welcome back',
+      titleSignUp: 'Create your account',
       subtitle: 'Pick up where you left off or set up a fresh workspace',
+      subtitleSignIn: 'Pick up your conversations right where you left off',
+      subtitleSignUp: 'Set up your calm workspace in seconds',
+      showPassword: 'Show password',
+      hidePassword: 'Hide password',
+      passwordMinHint: 'At least 6 characters',
       backToSignIn: 'Back to sign in',
       forgotDesc:
         'Enter the email address on your account and we’ll send over a quick verification and reset link.',
@@ -1545,8 +1566,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       backToLandingTitle: 'Back to landing page',
       closeMenuAria: 'Close menu',
       newChatTitle: 'New chat',
-      searchPlaceholder: 'Search chats (/)',
-      searchTitle: 'Search chats',
+      searchPlaceholder: 'Search chats',
+      searchTitle: 'Search chats (Ctrl/⌘+Shift+F)',
       noResults: 'No results found',
       noChatsYet: 'No chats yet',
       unpinTitle: 'Unpin',
@@ -1628,7 +1649,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       connectors: {
         title: 'Connectors',
         subtitle: 'Connect your tools with your permission so Longclaw can work with real data.',
-        openButtonTitle: 'Connectors (Gmail)',
+        openButtonTitle: 'Google Workspace Connectors',
         gmailName: 'Gmail',
         gmailDesc: 'Search your inbox, summarize emails, and draft or send replies with your confirmation.',
         connectedAs: (email) => `Connected as ${email}`,

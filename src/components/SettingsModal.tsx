@@ -9,24 +9,38 @@ import {
   Moon,
   Globe,
   Terminal,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
-import { ConnectorsIcon } from './Icons';
+import { ConnectorsIcon, LongclawLogo } from './Icons';
 import { AnimatePresence, motion } from 'motion/react';
+import {
+  LIQUID_EASE,
+  MODAL_BACKDROP_ENTER,
+  MODAL_BACKDROP_EXIT,
+  MODAL_SHEET_ENTER,
+  MODAL_SHEET_EXIT,
+} from '../lib/motion';
 import { User } from 'firebase/auth';
-import { CustomSlashCommand } from '../lib/firebase';
+import { CustomSlashCommand, syncUserProfile, updateProfile } from '../lib/firebase';
 import {
   getBuiltInCommands,
   getStarterCommandTemplates,
   normalizeCommandName,
 } from '../lib/commands';
 import { Language } from '../lib/i18n';
+import { LogoVariant, useAppearance } from '../lib/appearance';
+
+export type FontPreference = 'auto' | 'tr-sans' | 'jakarta' | 'serif';
+export type SettingsTab = 'profile' | 'commands' | 'general';
 
 interface SettingsModalProps {
   isOpen: boolean;
-  initialTab?: 'commands' | 'general';
+  initialTab?: SettingsTab;
   user: User | null;
   lang: Language;
   theme: 'light' | 'dark';
+  fontPref: FontPreference;
   customCommands: CustomSlashCommand[];
   workspaceConnected: boolean;
   workspaceEmail: string | null;
@@ -36,16 +50,19 @@ interface SettingsModalProps {
   onDeleteCommand: (commandId: string) => Promise<void>;
   onToggleTheme: () => void;
   onChangeLang: (lang: Language) => void;
+  onChangeFontPref: (pref: FontPreference) => void;
   onOpenConnectors: () => void;
+  onProfileUpdated?: () => void;
   onClose: () => void;
 }
 
 export function SettingsModal({
   isOpen,
-  initialTab = 'commands',
+  initialTab = 'profile',
   user,
   lang,
   theme,
+  fontPref,
   customCommands,
   workspaceConnected,
   workspaceEmail,
@@ -53,11 +70,15 @@ export function SettingsModal({
   onDeleteCommand,
   onToggleTheme,
   onChangeLang,
+  onChangeFontPref,
   onOpenConnectors,
+  onProfileUpdated,
   onClose,
 }: SettingsModalProps) {
   const isTr = lang === 'tr';
-  const [activeTab, setActiveTab] = useState<'commands' | 'general'>(initialTab);
+  const { logoVariant, setLogoVariant, accentTheme, setAccentTheme } = useAppearance();
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [descInput, setDescInput] = useState('');
@@ -66,15 +87,141 @@ export function SettingsModal({
   const [formError, setFormError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
+  // Profile editor state
+  const [profileName, setProfileName] = useState('');
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
+  const [avatarPreviewError, setAvatarPreviewError] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSaved, setProfileSaved] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
       setFormError(null);
+      setProfileError(null);
+      setProfileSaved(null);
+
+      let initialName = user?.displayName || '';
+      let initialPhoto = user?.photoURL || '';
+      if (!user) {
+        try {
+          initialName = localStorage.getItem('lc_guest_name') || '';
+          initialPhoto = localStorage.getItem('lc_guest_photo') || '';
+        } catch {}
+      }
+      setProfileName(initialName);
+      setProfilePhotoUrl(initialPhoto);
+      setAvatarPreviewError(false);
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, initialTab, user]);
+
+  useEffect(() => {
+    setAvatarPreviewError(false);
+  }, [profilePhotoUrl]);
 
   const builtIns = getBuiltInCommands(lang);
   const starters = getStarterCommandTemplates(lang);
+
+  const logoOptions: { id: LogoVariant; title: string; subtitle: string }[] = [
+    {
+      id: 'default',
+      title: isTr ? 'Klasik' : 'Classic',
+      subtitle: isTr ? 'Minimal iç içe halkalar' : 'Minimal interlocking rings',
+    },
+    {
+      id: 'fluffy-3d',
+      title: isTr ? 'Yumuşak Longclaw 3D' : 'Fluffy Longclaw 3D',
+      subtitle: isTr ? 'Yumuşak 3D peluş sürüm' : 'Soft 3D plush edition',
+    },
+    {
+      id: 'oldest',
+      title: isTr ? 'Longclaw İlk Logo' : 'Longclaw Oldest',
+      subtitle: isTr ? 'Orijinal pençe amblemi' : 'Original heritage crest',
+    },
+    {
+      id: 'pink-lavender',
+      title: isTr ? 'Pembe & Açık Mor' : 'Pink & Light Purple',
+      subtitle: isTr ? 'Pembe ve lila geçişli' : 'Rose & lavender gradient',
+    },
+  ];
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(null);
+    setProfileSaved(null);
+
+    const trimmedName = profileName.trim();
+    const trimmedPhoto = profilePhotoUrl.trim();
+
+    if (!trimmedName) {
+      setProfileError(
+        isTr ? 'Lütfen bir görünen ad gir.' : 'Please enter a display name.'
+      );
+      return;
+    }
+
+    if (trimmedName.length > 100) {
+      setProfileError(
+        isTr
+          ? 'Görünen ad en fazla 100 karakter olabilir.'
+          : 'Display name can be at most 100 characters.'
+      );
+      return;
+    }
+
+    if (trimmedPhoto) {
+      if (trimmedPhoto.length > 1000) {
+        setProfileError(
+          isTr
+            ? 'Fotoğraf bağlantısı çok uzun.'
+            : 'Photo URL is too long.'
+        );
+        return;
+      }
+      if (!/^https?:\/\/.+/i.test(trimmedPhoto)) {
+        setProfileError(
+          isTr
+            ? 'Fotoğraf bağlantısı https:// ile başlamalı.'
+            : 'Photo URL must start with https:// or http://.'
+        );
+        return;
+      }
+    }
+
+    try {
+      setSavingProfile(true);
+      if (user) {
+        await updateProfile(user, {
+          displayName: trimmedName,
+          photoURL: trimmedPhoto,
+        });
+        await syncUserProfile(user);
+      } else {
+        try {
+          localStorage.setItem('lc_guest_name', trimmedName);
+          if (trimmedPhoto) {
+            localStorage.setItem('lc_guest_photo', trimmedPhoto);
+          } else {
+            localStorage.removeItem('lc_guest_photo');
+          }
+        } catch {}
+      }
+      onProfileUpdated?.();
+      const label = isTr ? 'Profil güncellendi.' : 'Profile updated.';
+      setProfileSaved(label);
+      setTimeout(() => setProfileSaved((curr) => (curr === label ? null : curr)), 3000);
+    } catch (err: any) {
+      setProfileError(
+        err?.message ||
+          (isTr
+            ? 'Profil güncellenemedi. Lütfen tekrar dene.'
+            : 'Could not update profile. Please try again.')
+      );
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   const resetForm = () => {
     setEditingId(null);
@@ -180,429 +327,723 @@ export function SettingsModal({
     }
   };
 
+  const avatarInitial = (
+    profileName.trim() ||
+    user?.displayName ||
+    user?.email ||
+    'U'
+  )[0].toUpperCase();
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          key="settings-modal-backdrop"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          className="fixed inset-0 z-[75] bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6"
+          animate={{ opacity: 1, transition: MODAL_BACKDROP_ENTER }}
+          exit={{ opacity: 0, transition: MODAL_BACKDROP_EXIT }}
+          className="fixed inset-0 z-[75] bg-black/52 dark:bg-black/68 flex items-center justify-center p-3 sm:p-6"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.985 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            key="settings-modal-sheet"
+            role="dialog"
+            aria-modal="true"
+            initial={{ opacity: 0, y: 12, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1, transition: MODAL_SHEET_ENTER }}
+            exit={{ opacity: 0, y: 8, scale: 0.985, transition: MODAL_SHEET_EXIT }}
             onClick={(e) => e.stopPropagation()}
-            className="surface-3d-elevated w-full max-w-2xl max-h-[86dvh] rounded-2xl flex flex-col overflow-hidden text-[var(--tx)]"
+            className="surface-3d-elevated w-full max-w-2xl max-h-[86dvh] rounded-3xl flex flex-col overflow-hidden text-[var(--tx)]"
           >
             {/* Header */}
             <div className="px-5 sm:px-6 pt-5 pb-0 border-b border-[var(--bd)] shrink-0">
               <div className="flex items-center justify-between gap-3 pb-4">
                 <div>
-                  <h2 className="font-serif-fraunces text-xl font-semibold tracking-tight">
+                  <h2 className="font-serif-fraunces text-xl font-medium tracking-tight">
                     {isTr ? 'Ayarlar' : 'Settings'}
                   </h2>
                   <p className="text-xs text-[var(--mut)] mt-0.5">
                     {isTr
-                      ? 'Özel /komutlarını yönet ve çalışma alanını düzenle.'
-                      : 'Manage your /commands and workspace preferences.'}
+                      ? 'Profilini, Longclaw logosunu, komutlarını ve çalışma alanını düzenle.'
+                      : 'Customize your profile, Longclaw logo, /commands, and workspace.'}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
                   aria-label={isTr ? 'Kapat' : 'Close'}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer"
+                  className="w-8.5 h-8.5 rounded-full flex items-center justify-center text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Clean underline tabs */}
+              {/* Clean compositor-only active underline tabs */}
               <div className="flex items-center gap-6 text-xs font-medium">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('commands')}
-                  className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
-                    activeTab === 'commands'
-                      ? 'border-[var(--tx)] text-[var(--tx)] font-semibold'
-                      : 'border-transparent text-[var(--mut)] hover:text-[var(--tx)]'
-                  }`}
-                >
-                  {isTr ? 'Komutlar (/)' : 'Commands (/)'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('general')}
-                  className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
-                    activeTab === 'general'
-                      ? 'border-[var(--tx)] text-[var(--tx)] font-semibold'
-                      : 'border-transparent text-[var(--mut)] hover:text-[var(--tx)]'
-                  }`}
-                >
-                  {isTr ? 'Genel' : 'General'}
-                </button>
+                {(
+                  [
+                    { id: 'profile', label: isTr ? 'Profil' : 'Profile' },
+                    { id: 'commands', label: isTr ? 'Komutlar (/)' : 'Commands (/)' },
+                    { id: 'general', label: isTr ? 'Genel' : 'General' },
+                  ] as const
+                ).map((tab) => {
+                  const active = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`relative pb-2.5 transition-colors cursor-pointer whitespace-nowrap ${
+                        active
+                          ? 'text-[var(--tx)] font-semibold'
+                          : 'text-[var(--mut)] hover:text-[var(--tx)]'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span
+                        aria-hidden="true"
+                        className={`absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[var(--ac)] origin-center transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                          active ? 'scale-x-100 opacity-100' : 'scale-x-0 opacity-0'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-6">
-              {activeTab === 'commands' ? (
-                <>
-                  {/* Add / Edit Command Form */}
-                  <form onSubmit={handleSubmit} className="space-y-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold">
-                        {editingId
-                          ? isTr
-                            ? 'Komutu düzenle'
-                            : 'Edit command'
-                          : isTr
-                            ? 'Yeni komut ekle'
-                            : 'Add a command'}
-                      </h3>
-                      {editingId && (
-                        <button
-                          type="button"
-                          onClick={resetForm}
-                          className="text-xs text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer"
-                        >
-                          {isTr ? 'Vazgeç' : 'Cancel edit'}
-                        </button>
-                      )}
-                    </div>
+            <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5">
+              <AnimatePresence mode="wait" initial={false}>
+                {activeTab === 'profile' ? (
+                  <motion.div
+                    key="settings-profile-panel"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16, ease: LIQUID_EASE }}
+                    className="space-y-6"
+                  >
+                    {/* User Profile Update Form */}
+                    <form onSubmit={handleSaveProfile} className="space-y-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-[var(--ac)] text-[var(--on)] flex items-center justify-center font-display font-bold text-base shrink-0 overflow-hidden ring-1 ring-[var(--bd)]">
+                          {profilePhotoUrl.trim() && !avatarPreviewError ? (
+                            <img
+                              src={profilePhotoUrl.trim()}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              onError={() => setAvatarPreviewError(true)}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            avatarInitial
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold truncate">
+                            {isTr ? 'Profil bilgileri' : 'Your profile'}
+                          </h3>
+                          <p className="text-xs text-[var(--mut)] truncate mt-0.5">
+                            {user?.email ||
+                              (isTr
+                                ? 'Misafir oturumu · Bu cihazda saklanır'
+                                : 'Guest session · Saved on this device')}
+                          </p>
+                        </div>
+                      </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-[var(--mut)] mb-1">
-                          {isTr ? 'Komut adı' : 'Command name'}
-                        </label>
-                        <div className="well-3d flex items-center rounded-xl px-3 h-9.5 focus-within:border-[var(--tx)]/45 transition-colors">
-                          <span className="font-mono text-sm text-[var(--mut)] select-none mr-0.5">
-                            /
-                          </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-[var(--mut)] mb-1">
+                            {isTr ? 'Görünen ad' : 'Display name'}
+                          </label>
                           <input
                             type="text"
-                            value={nameInput}
+                            value={profileName}
                             onChange={(e) => {
-                              setNameInput(e.target.value);
-                              if (formError) setFormError(null);
+                              setProfileName(e.target.value);
+                              if (profileError) setProfileError(null);
                             }}
-                            placeholder={isTr ? 'ornek-komut' : 'email'}
-                            maxLength={32}
-                            className="w-full bg-transparent border-0 outline-none text-sm font-mono text-[var(--tx)] placeholder:text-[var(--mut)]/65"
+                            placeholder={isTr ? 'Adın soyadın' : 'Your name'}
+                            maxLength={100}
+                            className="well-3d w-full rounded-xl px-3 h-9.5 outline-none text-sm text-[var(--tx)] placeholder:text-[var(--mut)]/65 focus:border-[var(--tx)]/45 transition-colors"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-[var(--mut)] mb-1">
+                            {isTr
+                              ? 'Profil fotoğrafı URL (isteğe bağlı)'
+                              : 'Avatar photo URL (optional)'}
+                          </label>
+                          <input
+                            type="url"
+                            value={profilePhotoUrl}
+                            onChange={(e) => {
+                              setProfilePhotoUrl(e.target.value);
+                              if (profileError) setProfileError(null);
+                            }}
+                            placeholder="https://..."
+                            maxLength={1000}
+                            className="well-3d w-full rounded-xl px-3 h-9.5 outline-none text-sm text-[var(--tx)] placeholder:text-[var(--mut)]/65 focus:border-[var(--tx)]/45 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {profileError && (
+                        <p className="text-xs text-red-500 flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileError}</span>
+                        </p>
+                      )}
+
+                      {profileSaved && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileSaved}</span>
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between gap-3 pt-0.5">
+                        <span className="text-[11px] text-[var(--mut)]">
+                          {isTr
+                            ? 'Kenar çubuğu ve karşılama mesajında görünür.'
+                            : 'Shown in the sidebar and welcome greeting.'}
+                        </span>
+                        <button
+                          type="submit"
+                          disabled={savingProfile}
+                          className="btn-3d-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium cursor-pointer disabled:opacity-45 shrink-0"
+                        >
+                          {savingProfile ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          <span>{isTr ? 'Profili kaydet' : 'Save profile'}</span>
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Customize Longclaw Logo */}
+                    <div className="pt-5 border-t border-[var(--bd)] space-y-3.5">
+                      <div>
+                        <h3 className="text-sm font-semibold">
+                          {isTr ? 'Longclaw logosunu özelleştir' : 'Customize Longclaw logo'}
+                        </h3>
+                        <p className="text-xs text-[var(--mut)] mt-0.5">
+                          {isTr
+                            ? 'Uygulama genelinde görünecek Longclaw logosunu seç.'
+                            : 'Choose which Longclaw logo appears across the workspace.'}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {logoOptions.map((opt) => {
+                          const selected = logoVariant === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setLogoVariant(opt.id)}
+                              aria-pressed={selected}
+                              className={`flex items-center gap-3 p-3 rounded-2xl border text-left transition-colors cursor-pointer ${
+                                selected
+                                  ? 'bg-[var(--surf)] border-[var(--ac)] shadow-xs'
+                                  : 'bg-[var(--card)]/55 border-[var(--bd)] hover:border-[var(--tx)]/30 hover:bg-[var(--surf)]/60'
+                              }`}
+                            >
+                              <div className="w-[52px] h-[52px] rounded-xl bg-[var(--bg)] border border-[var(--bd)] flex items-center justify-center shrink-0">
+                                <LongclawLogo
+                                  variant={opt.id}
+                                  className="w-[38px] h-[38px] text-[var(--tx)]"
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-semibold text-[var(--tx)] truncate">
+                                  {opt.title}
+                                </p>
+                                <p className="text-[11px] text-[var(--mut)] truncate mt-0.5">
+                                  {opt.subtitle}
+                                </p>
+                              </div>
+                              <div
+                                className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                                  selected
+                                    ? 'bg-[var(--ac)] text-[var(--on)]'
+                                    : 'border border-[var(--bd)]'
+                                }`}
+                              >
+                                {selected && <Check className="w-3 h-3" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Pink Theme Toggle */}
+                    <div className="pt-5 border-t border-[var(--bd)] flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          aria-hidden="true"
+                          className="w-9 h-9 rounded-xl shrink-0 border border-[var(--bd)]"
+                          style={{
+                            background:
+                              'linear-gradient(135deg, #EC4899 0%, #F472B6 48%, #C084FC 100%)',
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[var(--tx)]">
+                            {isTr ? 'Pembe tema' : 'Pink theme'}
+                          </p>
+                          <p className="text-xs text-[var(--mut)] mt-0.5 leading-snug">
+                            {isTr
+                              ? 'Açıldığında pembe & açık mor renk paletini ve logosunu etkinleştirir.'
+                              : 'Enables the pink & light purple palette and switches to the matching logo.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={accentTheme === 'pink'}
+                        aria-label={isTr ? 'Pembe temayı aç veya kapat' : 'Toggle pink theme'}
+                        onClick={() =>
+                          setAccentTheme(accentTheme === 'pink' ? 'classic' : 'pink')
+                        }
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors cursor-pointer ${
+                          accentTheme === 'pink'
+                            ? 'bg-[var(--ac)] border-transparent'
+                            : 'bg-[var(--surf)] border-[var(--bd)]'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                            accentTheme === 'pink' ? 'translate-x-[22px]' : 'translate-x-[2px]'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : activeTab === 'commands' ? (
+                  <motion.div
+                    key="settings-commands-panel"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16, ease: LIQUID_EASE }}
+                    className="space-y-6"
+                  >
+                    {/* Add / Edit Command Form */}
+                    <form onSubmit={handleSubmit} className="space-y-3.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold">
+                          {editingId
+                            ? isTr
+                              ? 'Komutu düzenle'
+                              : 'Edit command'
+                            : isTr
+                              ? 'Yeni komut ekle'
+                              : 'Add a command'}
+                        </h3>
+                        {editingId && (
+                          <button
+                            type="button"
+                            onClick={resetForm}
+                            className="text-xs text-[var(--mut)] hover:text-[var(--tx)] cursor-pointer"
+                          >
+                            {isTr ? 'Vazgeç' : 'Cancel edit'}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-[var(--mut)] mb-1">
+                            {isTr ? 'Komut adı' : 'Command name'}
+                          </label>
+                          <div className="well-3d flex items-center rounded-xl px-3 h-9.5 focus-within:border-[var(--tx)]/45 transition-colors">
+                            <span className="font-mono text-sm text-[var(--mut)] select-none mr-0.5">
+                              /
+                            </span>
+                            <input
+                              type="text"
+                              value={nameInput}
+                              onChange={(e) => {
+                                setNameInput(e.target.value);
+                                if (formError) setFormError(null);
+                              }}
+                              placeholder={isTr ? 'ornek-komut' : 'email'}
+                              maxLength={32}
+                              className="w-full bg-transparent border-0 outline-none text-sm font-mono text-[var(--tx)] placeholder:text-[var(--mut)]/65"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-[var(--mut)] mb-1">
+                            {isTr ? 'Kısa açıklama (isteğe bağlı)' : 'Short description (optional)'}
+                          </label>
+                          <input
+                            type="text"
+                            value={descInput}
+                            onChange={(e) => setDescInput(e.target.value)}
+                            placeholder={
+                              isTr
+                                ? 'Örn. Kısa ve nazik bir e-posta yaz'
+                                : 'e.g. Draft a concise reply'
+                            }
+                            maxLength={140}
+                            className="well-3d w-full rounded-xl px-3 h-9.5 outline-none text-sm text-[var(--tx)] placeholder:text-[var(--mut)]/65 focus:border-[var(--tx)]/45 transition-colors"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-medium text-[var(--mut)] mb-1">
-                          {isTr ? 'Kısa açıklama (isteğe bağlı)' : 'Short description (optional)'}
-                        </label>
-                        <input
-                          type="text"
-                          value={descInput}
-                          onChange={(e) => setDescInput(e.target.value)}
+                        <div className="flex items-baseline justify-between gap-2 mb-1">
+                          <label className="text-[11px] font-medium text-[var(--mut)]">
+                            {isTr ? 'Komut yönergesi' : 'Prompt instruction'}
+                          </label>
+                          <span className="text-[11px] text-[var(--mut)]">
+                            {isTr
+                              ? 'Yazdığın metnin yerleşeceği yer için {input} kullanabilirsin'
+                              : 'Use {input} where your message text should go'}
+                          </span>
+                        </div>
+                        <textarea
+                          rows={3}
+                          value={promptInput}
+                          onChange={(e) => {
+                            setPromptInput(e.target.value);
+                            if (formError) setFormError(null);
+                          }}
                           placeholder={
                             isTr
-                              ? 'Örn. Kısa ve nazik bir e-posta yaz'
-                              : 'e.g. Draft a concise reply'
+                              ? 'Şu notlara göre kısa ve net bir e-posta taslağı hazırla:\n{input}'
+                              : 'Write a clear, concise email based on these notes:\n{input}'
                           }
-                          maxLength={140}
-                          className="well-3d w-full rounded-xl px-3 h-9.5 outline-none text-sm text-[var(--tx)] placeholder:text-[var(--mut)]/65 focus:border-[var(--tx)]/45 transition-colors"
+                          maxLength={2000}
+                          className="well-3d w-full rounded-xl px-3 py-2.5 outline-none text-sm leading-relaxed text-[var(--tx)] placeholder:text-[var(--mut)]/65 resize-none focus:border-[var(--tx)]/45 transition-colors"
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <div className="flex items-baseline justify-between gap-2 mb-1">
-                        <label className="text-[11px] font-medium text-[var(--mut)]">
-                          {isTr ? 'Komut yönergesi' : 'Prompt instruction'}
-                        </label>
+                      {formError && (
+                        <p className="text-xs text-red-500">{formError}</p>
+                      )}
+
+                      {savedNotice && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{savedNotice}</span>
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between gap-3 pt-0.5">
                         <span className="text-[11px] text-[var(--mut)]">
-                          {isTr
-                            ? 'Yazdığın metnin yerleşeceği yer için {input} kullanabilirsin'
-                            : 'Use {input} where your message text should go'}
+                          {nameInput.trim()
+                            ? `${isTr ? 'Önizleme:' : 'Trigger:'} /${normalizeCommandName(nameInput) || '...'}`
+                            : isTr
+                              ? 'Sohbette / yazarak komut menüsünü açabilirsin.'
+                              : 'Type / in the chat bar to use any command.'}
+                        </span>
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="btn-3d-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium cursor-pointer disabled:opacity-45"
+                        >
+                          {editingId ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>{isTr ? 'Değişiklikleri kaydet' : 'Save changes'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>{isTr ? 'Komut ekle' : 'Add command'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Custom Commands List */}
+                    <div className="pt-5 border-t border-[var(--bd)] space-y-3">
+                      <div className="flex items-baseline justify-between">
+                        <h3 className="text-sm font-semibold">
+                          {isTr ? 'Senin komutların' : 'Your commands'}
+                        </h3>
+                        <span className="text-[11px] text-[var(--mut)]">
+                          {customCommands.length}
                         </span>
                       </div>
-                      <textarea
-                        rows={3}
-                        value={promptInput}
-                        onChange={(e) => {
-                          setPromptInput(e.target.value);
-                          if (formError) setFormError(null);
-                        }}
-                        placeholder={
-                          isTr
-                            ? 'Şu notlara göre kısa ve net bir e-posta taslağı hazırla:\n{input}'
-                            : 'Write a clear, concise email based on these notes:\n{input}'
-                        }
-                        maxLength={2000}
-                        className="well-3d w-full rounded-xl px-3 py-2.5 outline-none text-sm leading-relaxed text-[var(--tx)] placeholder:text-[var(--mut)]/65 resize-none focus:border-[var(--tx)]/45 transition-colors"
-                      />
+
+                      {customCommands.length === 0 ? (
+                        <div className="space-y-3">
+                          <p className="text-xs text-[var(--mut)] leading-relaxed">
+                            {isTr
+                              ? 'Henüz özel bir komutun yok. Yukarıdan kendi komutunu ekleyebilir veya şu örneklerden biriyle başlayabilirsin:'
+                              : 'No custom commands yet. Create one above, or add a quick starter:'}
+                          </p>
+                          <div className="divide-y divide-[var(--bd)]/75 border-y border-[var(--bd)]/75">
+                            {starters.map((tpl) => (
+                              <div
+                                key={tpl.name}
+                                className="py-2.5 flex items-center justify-between gap-3"
+                              >
+                                <div className="min-w-0">
+                                  <span className="font-mono text-xs font-semibold text-[var(--tx)]">
+                                    /{tpl.name}
+                                  </span>
+                                  <p className="text-xs text-[var(--mut)] truncate mt-0.5">
+                                    {tpl.description}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() => void handleQuickAddStarter(tpl)}
+                                  className="btn-3d-soft px-3 py-1.5 rounded-full text-xs font-medium shrink-0 cursor-pointer"
+                                >
+                                  {isTr ? 'Ekle' : 'Add'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-[var(--bd)]/80 border-y border-[var(--bd)]/80">
+                          {customCommands.map((cmd) => (
+                            <div
+                              key={cmd.id}
+                              className="py-3 flex items-start justify-between gap-3 group"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-baseline gap-2 flex-wrap">
+                                  <span className="font-mono text-xs font-semibold text-[var(--tx)]">
+                                    /{cmd.name}
+                                  </span>
+                                  {cmd.description && (
+                                    <span className="text-xs text-[var(--mut)]">
+                                      {cmd.description}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-[var(--mut)]/85 mt-1 line-clamp-2 leading-relaxed">
+                                  {cmd.prompt}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(cmd)}
+                                  title={isTr ? 'Düzenle' : 'Edit'}
+                                  className="p-1.5 rounded-lg text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (editingId === cmd.id) resetForm();
+                                    void onDeleteCommand(cmd.id);
+                                  }}
+                                  title={isTr ? 'Sil' : 'Delete'}
+                                  className="p-1.5 rounded-lg text-[var(--mut)] hover:text-red-500 hover:bg-[var(--surf)] transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    {formError && (
-                      <p className="text-xs text-red-500">{formError}</p>
-                    )}
-
-                    {savedNotice && (
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                        <Check className="w-3.5 h-3.5" />
-                        <span>{savedNotice}</span>
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between gap-3 pt-0.5">
-                      <span className="text-[11px] text-[var(--mut)]">
-                        {nameInput.trim()
-                          ? `${isTr ? 'Önizleme:' : 'Trigger:'} /${normalizeCommandName(nameInput) || '...'}`
-                          : isTr
-                            ? 'Sohbette / yazarak komut menüsünü açabilirsin.'
-                            : 'Type / in the chat bar to use any command.'}
-                      </span>
+                    {/* Built-in Commands Reference */}
+                    <div className="pt-5 border-t border-[var(--bd)] space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <Terminal className="w-3.5 h-3.5 text-[var(--mut)]" />
+                        <h3 className="text-xs font-semibold text-[var(--mut)]">
+                          {isTr ? 'Hazır komutlar' : 'Built-in commands'}
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pt-1">
+                        {builtIns.map((cmd) => (
+                          <div
+                            key={cmd.id}
+                            className="flex items-baseline justify-between gap-3 py-1.5 border-b border-[var(--bd)]/55 text-xs"
+                          >
+                            <span className="font-mono font-medium text-[var(--tx)] shrink-0">
+                              /{cmd.name}
+                            </span>
+                            <span className="text-[var(--mut)] truncate text-right">
+                              {cmd.description}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="settings-general-panel"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16, ease: LIQUID_EASE }}
+                    className="divide-y divide-[var(--bd)]/80"
+                  >
+                    {/* Appearance */}
+                    <div className="py-4 first:pt-0 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {isTr ? 'Görünüm' : 'Appearance'}
+                        </p>
+                        <p className="text-xs text-[var(--mut)] mt-0.5">
+                          {theme === 'dark'
+                            ? isTr
+                              ? 'Koyu tema etkin'
+                              : 'Dark theme active'
+                            : isTr
+                              ? 'Açık tema etkin'
+                              : 'Light theme active'}
+                        </p>
+                      </div>
                       <button
-                        type="submit"
-                        disabled={saving}
-                        className="btn-3d-primary inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium cursor-pointer disabled:opacity-45"
+                        type="button"
+                        onClick={onToggleTheme}
+                        className="btn-3d-soft inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium cursor-pointer"
                       >
-                        {editingId ? (
+                        {theme === 'dark' ? (
                           <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>{isTr ? 'Değişiklikleri kaydet' : 'Save changes'}</span>
+                            <Sun className="w-3.5 h-3.5" />
+                            <span>{isTr ? 'Açık tema' : 'Switch to light'}</span>
                           </>
                         ) : (
                           <>
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>{isTr ? 'Komut ekle' : 'Add command'}</span>
+                            <Moon className="w-3.5 h-3.5" />
+                            <span>{isTr ? 'Koyu tema' : 'Switch to dark'}</span>
                           </>
                         )}
                       </button>
                     </div>
-                  </form>
 
-                  {/* Custom Commands List */}
-                  <div className="pt-5 border-t border-[var(--bd)] space-y-3">
-                    <div className="flex items-baseline justify-between">
-                      <h3 className="text-sm font-semibold">
-                        {isTr ? 'Senin komutların' : 'Your commands'}
-                      </h3>
-                      <span className="text-[11px] text-[var(--mut)]">
-                        {customCommands.length}
-                      </span>
+                    {/* Language */}
+                    <div className="py-4 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {isTr ? 'Dil' : 'Language'}
+                        </p>
+                        <p className="text-xs text-[var(--mut)] mt-0.5">
+                          {isTr
+                            ? 'Arayüz ve hazır komut açıklamaları'
+                            : 'Interface and built-in command labels'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onChangeLang(lang === 'tr' ? 'en' : 'tr')}
+                        className="btn-3d-soft inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium cursor-pointer"
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>{lang === 'tr' ? 'Switch to English' : 'Türkçeye geç'}</span>
+                      </button>
                     </div>
 
-                    {customCommands.length === 0 ? (
-                      <div className="space-y-3">
-                        <p className="text-xs text-[var(--mut)] leading-relaxed">
-                          {isTr
-                            ? 'Henüz özel bir komutun yok. Yukarıdan kendi komutunu ekleyebilir veya şu örneklerden biriyle başlayabilirsin:'
-                            : 'No custom commands yet. Create one above, or add a quick starter:'}
+                    {/* Typography / Turkish Font Selector */}
+                    <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {isTr ? 'Yazı tipi' : 'Typography'}
                         </p>
-                        <div className="divide-y divide-[var(--bd)]/75 border-y border-[var(--bd)]/75">
-                          {starters.map((tpl) => (
-                            <div
-                              key={tpl.name}
-                              className="py-2.5 flex items-center justify-between gap-3"
-                            >
-                              <div className="min-w-0">
-                                <span className="font-mono text-xs font-semibold text-[var(--tx)]">
-                                  /{tpl.name}
-                                </span>
-                                <p className="text-xs text-[var(--mut)] truncate mt-0.5">
-                                  {tpl.description}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                disabled={saving}
-                                onClick={() => void handleQuickAddStarter(tpl)}
-                                className="btn-3d-soft px-3 py-1.5 rounded-full text-xs font-medium shrink-0 cursor-pointer"
-                              >
-                                {isTr ? 'Ekle' : 'Add'}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                        <p className="text-xs text-[var(--mut)] mt-0.5">
+                          {isTr
+                            ? 'Türkçe karakterlere (ğ, ş, ı, İ) tam uyumlu yazı tipleri'
+                            : 'Switch between auto language-matched, Turkish-tuned DM Sans, Jakarta, or Serif'}
+                        </p>
                       </div>
-                    ) : (
-                      <div className="divide-y divide-[var(--bd)]/80 border-y border-[var(--bd)]/80">
-                        {customCommands.map((cmd) => (
-                          <div
-                            key={cmd.id}
-                            className="py-3 flex items-start justify-between gap-3 group"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-baseline gap-2 flex-wrap">
-                                <span className="font-mono text-xs font-semibold text-[var(--tx)]">
-                                  /{cmd.name}
-                                </span>
-                                {cmd.description && (
-                                  <span className="text-xs text-[var(--mut)]">
-                                    {cmd.description}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-[var(--mut)]/85 mt-1 line-clamp-2 leading-relaxed">
-                                {cmd.prompt}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(cmd)}
-                                title={isTr ? 'Düzenle' : 'Edit'}
-                                className="p-1.5 rounded-lg text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (editingId === cmd.id) resetForm();
-                                  void onDeleteCommand(cmd.id);
-                                }}
-                                title={isTr ? 'Sil' : 'Delete'}
-                                className="p-1.5 rounded-lg text-[var(--mut)] hover:text-red-500 hover:bg-[var(--surf)] transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="segmented-track-3d inline-flex items-center gap-1 p-1 rounded-full shrink-0 self-start sm:self-auto">
+                        {(
+                          [
+                            { id: 'auto', label: isTr ? 'Otomatik' : 'Auto' },
+                            { id: 'tr-sans', label: 'DM Sans' },
+                            { id: 'jakarta', label: 'Jakarta' },
+                            { id: 'serif', label: 'Serif' },
+                          ] as const
+                        ).map((opt) => {
+                          const active = fontPref === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => onChangeFontPref(opt.id)}
+                              className={`px-2.5 py-1 rounded-full text-xs transition-colors cursor-pointer whitespace-nowrap ${
+                                active
+                                  ? 'segmented-thumb-3d text-[var(--tx)] font-semibold'
+                                  : 'text-[var(--mut)] hover:text-[var(--tx)] font-medium'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Connectors */}
+                    <div className="py-4 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
+                          {isTr ? 'Google Workspace bağlayıcıları' : 'Google Workspace connectors'}
+                        </p>
+                        <p className="text-xs text-[var(--mut)] mt-0.5 truncate">
+                          {workspaceConnected
+                            ? workspaceEmail || (isTr ? 'Bağlı' : 'Connected')
+                            : isTr
+                              ? 'Gmail, Takvim, Drive, Dokümanlar ve Görevler'
+                              : 'Gmail, Calendar, Drive, Docs, and Tasks'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenConnectors();
+                        }}
+                        className="btn-3d-soft inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium shrink-0 cursor-pointer"
+                      >
+                        <ConnectorsIcon className="w-3.5 h-3.5" />
+                        <span>{isTr ? 'Yönet' : 'Manage'}</span>
+                      </button>
+                    </div>
+
+                    {/* Account summary */}
+                    {user && (
+                      <div className="py-4 flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {isTr ? 'Hesap' : 'Account'}
+                          </p>
+                          <p className="text-xs text-[var(--mut)] mt-0.5 truncate">
+                            {user.displayName ? `${user.displayName} · ` : ''}
+                            {user.email || ''}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('profile')}
+                          className="btn-3d-soft px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 cursor-pointer"
+                        >
+                          {isTr ? 'Profili düzenle' : 'Edit profile'}
+                        </button>
                       </div>
                     )}
-                  </div>
-
-                  {/* Built-in Commands Reference */}
-                  <div className="pt-5 border-t border-[var(--bd)] space-y-2.5">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="w-3.5 h-3.5 text-[var(--mut)]" />
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--mut)]">
-                        {isTr ? 'Hazır komutlar' : 'Built-in commands'}
-                      </h3>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pt-1">
-                      {builtIns.map((cmd) => (
-                        <div
-                          key={cmd.id}
-                          className="flex items-baseline justify-between gap-3 py-1.5 border-b border-[var(--bd)]/55 text-xs"
-                        >
-                          <span className="font-mono font-medium text-[var(--tx)] shrink-0">
-                            /{cmd.name}
-                          </span>
-                          <span className="text-[var(--mut)] truncate text-right">
-                            {cmd.description}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="divide-y divide-[var(--bd)]/80">
-                  {/* Appearance */}
-                  <div className="py-4 first:pt-0 flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium">
-                        {isTr ? 'Görünüm' : 'Appearance'}
-                      </p>
-                      <p className="text-xs text-[var(--mut)] mt-0.5">
-                        {theme === 'dark'
-                          ? isTr
-                            ? 'Koyu tema etkin'
-                            : 'Dark theme active'
-                          : isTr
-                            ? 'Açık tema etkin'
-                            : 'Light theme active'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onToggleTheme}
-                      className="btn-3d-soft inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium cursor-pointer"
-                    >
-                      {theme === 'dark' ? (
-                        <>
-                          <Sun className="w-3.5 h-3.5" />
-                          <span>{isTr ? 'Açık tema' : 'Switch to light'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Moon className="w-3.5 h-3.5" />
-                          <span>{isTr ? 'Koyu tema' : 'Switch to dark'}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Language */}
-                  <div className="py-4 flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium">
-                        {isTr ? 'Dil' : 'Language'}
-                      </p>
-                      <p className="text-xs text-[var(--mut)] mt-0.5">
-                        {isTr
-                          ? 'Arayüz ve hazır komut açıklamaları'
-                          : 'Interface and built-in command labels'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onChangeLang(lang === 'tr' ? 'en' : 'tr')}
-                      className="btn-3d-soft inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium cursor-pointer"
-                    >
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>{lang === 'tr' ? 'Switch to English' : 'Türkçeye geç'}</span>
-                    </button>
-                  </div>
-
-                  {/* Connectors */}
-                  <div className="py-4 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        {isTr ? 'Google Workspace bağlayıcıları' : 'Google Workspace connectors'}
-                      </p>
-                      <p className="text-xs text-[var(--mut)] mt-0.5 truncate">
-                        {workspaceConnected
-                          ? workspaceEmail || (isTr ? 'Bağlı' : 'Connected')
-                          : isTr
-                            ? 'Gmail, Takvim, Drive, Dokümanlar ve Görevler'
-                            : 'Gmail, Calendar, Drive, Docs, and Tasks'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onOpenConnectors();
-                      }}
-                      className="btn-3d-soft inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium shrink-0 cursor-pointer"
-                    >
-                      <ConnectorsIcon className="w-3.5 h-3.5" />
-                      <span>{isTr ? 'Yönet' : 'Manage'}</span>
-                    </button>
-                  </div>
-
-                  {/* Account summary */}
-                  {user && (
-                    <div className="py-4">
-                      <p className="text-sm font-medium">
-                        {isTr ? 'Hesap' : 'Account'}
-                      </p>
-                      <p className="text-xs text-[var(--mut)] mt-0.5">
-                        {user.displayName ? `${user.displayName} · ` : ''}
-                        {user.email || ''}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         </motion.div>

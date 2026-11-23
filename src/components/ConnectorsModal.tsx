@@ -21,6 +21,12 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  MODAL_BACKDROP_ENTER,
+  MODAL_BACKDROP_EXIT,
+  MODAL_SHEET_ENTER,
+  MODAL_SHEET_EXIT,
+} from '../lib/motion';
+import {
   GmailIcon,
   GoogleCalendarIcon,
   GoogleDocsIcon,
@@ -183,20 +189,20 @@ export function WorkspaceConfirmMutationDialog({
     <AnimatePresence>
       {action && meta && (
         <motion.div
+          key="workspace-confirm-backdrop"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/65 backdrop-blur-xs"
+          animate={{ opacity: 1, transition: MODAL_BACKDROP_ENTER }}
+          exit={{ opacity: 0, transition: MODAL_BACKDROP_EXIT }}
+          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/58 dark:bg-black/72"
           onClick={() => {
             if (!submitting) onCancel();
           }}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            key="workspace-confirm-sheet"
+            initial={{ opacity: 0, scale: 0.985, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0, transition: MODAL_SHEET_ENTER }}
+            exit={{ opacity: 0, scale: 0.985, y: 8, transition: MODAL_SHEET_EXIT }}
             role="alertdialog"
             aria-modal="true"
             className="surface-3d-elevated w-full max-w-[460px] max-h-[88dvh] overflow-y-auto text-[var(--tx)] rounded-3xl p-5 sm:p-6 space-y-4"
@@ -745,18 +751,20 @@ export function ConnectorsModal({
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            key="connectors-modal-backdrop"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/60 backdrop-blur-xs"
+            animate={{ opacity: 1, transition: MODAL_BACKDROP_ENTER }}
+            exit={{ opacity: 0, transition: MODAL_BACKDROP_EXIT }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/52 dark:bg-black/68"
             onClick={onClose}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              key="connectors-modal-sheet"
+              role="dialog"
+              aria-modal="true"
+              initial={{ opacity: 0, scale: 0.985, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0, transition: MODAL_SHEET_ENTER }}
+              exit={{ opacity: 0, scale: 0.985, y: 8, transition: MODAL_SHEET_EXIT }}
               className="surface-3d-elevated w-full max-w-[640px] max-h-[90dvh] flex flex-col text-[var(--tx)] rounded-3xl sm:rounded-[28px] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >

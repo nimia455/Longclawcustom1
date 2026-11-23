@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   Code2,
@@ -80,9 +80,14 @@ export function CodePreviewPanel({
     setConsoleOpen(previewDoc.isConsoleFirst);
   }, [runId, previewDoc.isConsoleFirst]);
 
-  // Receive console & error messages from sandboxed iframe
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Receive console & error messages strictly from our sandboxed preview iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (!iframeRef.current?.contentWindow || event.source !== iframeRef.current.contentWindow) {
+        return;
+      }
       const data = event.data;
       if (!data || data.source !== 'longclaw-preview' || data.runId !== runId) return;
 
@@ -109,10 +114,14 @@ export function CodePreviewPanel({
     return () => window.removeEventListener('message', handleMessage);
   }, [runId]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard API may be blocked in restricted iframe contexts
+    }
   };
 
   const handleDownload = () => {
@@ -285,6 +294,7 @@ export function CodePreviewPanel({
               }`}
             >
               <iframe
+                ref={iframeRef}
                 key={runId}
                 title={`${cp.liveResultTitle} (${normalizedLang})`}
                 srcDoc={previewDoc.srcDoc}

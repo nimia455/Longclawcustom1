@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,8 +11,115 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
+const serverStartedAt = Date.now();
+
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+// Production-safe response headers (intentionally omits X-Frame-Options to preserve iframe embeds)
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+// Safe CORS for GitHub Pages (*.github.io) and explicitly allowed origins calling /api/*
+const configuredAllowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+);
+
+function isAllowedCorsOrigin(origin: string): boolean {
+  const normalized = origin.trim().replace(/\/+$/, '');
+  if (!normalized) return false;
+  if (configuredAllowedOrigins.has(normalized)) return true;
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol === 'https:' && parsed.hostname.endsWith('.github.io')) {
+      return true;
+    }
+    if (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')
+    ) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+  if (origin && isAllowedCorsOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Expose-Headers', 'Retry-After');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
 
 app.use(express.json({ limit: '15mb' }));
+
+// Lightweight in-memory sliding-window rate limiter per client IP + route bucket
+const rateLimitBuckets = new Map<string, number[]>();
+
+function getClientIp(req: Request): string {
+  const fwd = req.headers['x-forwarded-for'];
+  if (typeof fwd === 'string' && fwd.trim()) {
+    return fwd.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function createRateLimiter(bucket: string, maxRequests: number, windowMs: number) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const now = Date.now();
+    const key = `${bucket}:${getClientIp(req)}`;
+    const recent = (rateLimitBuckets.get(key) || []).filter((ts) => now - ts < windowMs);
+
+    if (recent.length >= maxRequests) {
+      const retryAfterSec = Math.max(1, Math.ceil((recent[0] + windowMs - now) / 1000));
+      const uiLang = resolveUiLang(req.body);
+      res.setHeader('Retry-After', String(retryAfterSec));
+      return res.status(429).json({
+        error:
+          uiLang === 'en'
+            ? `Too many requests right now. Please wait ${retryAfterSec} seconds and try again.`
+            : `Çok fazla istek gönderildi. Lütfen ${retryAfterSec} saniye bekleyip tekrar dene.`,
+      });
+    }
+
+    recent.push(now);
+    rateLimitBuckets.set(key, recent);
+
+    // Prevent unbounded growth on long-running servers
+    if (rateLimitBuckets.size > 4000) {
+      for (const [k, timestamps] of rateLimitBuckets.entries()) {
+        if (timestamps.length === 0 || now - timestamps[timestamps.length - 1] > windowMs) {
+          rateLimitBuckets.delete(k);
+        }
+      }
+    }
+
+    next();
+  };
+}
+
+const chatRateLimit = createRateLimiter('chat', 40, 60_000);
+const imageRateLimit = createRateLimiter('image', 12, 60_000);
+const titleRateLimit = createRateLimiter('title', 40, 60_000);
+const workspaceRateLimit = createRateLimiter('workspace', 25, 60_000);
+const proxyRateLimit = createRateLimiter('proxy', 60, 60_000);
 
 // Multi-key unpaid Gemini client pool (supports up to 3 fallback keys: GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3)
 const clientPool = new Map<string, GoogleGenAI>();
@@ -192,22 +299,44 @@ const PUBLIC_MODEL_DISPLAY_NAMES: Record<string, string> = {
   'longclaw-clawing-1.1': 'Longclaw Clawing 1.1',
 };
 
-function buildSystemIdentity(publicModel: string): string {
-  const modelDisplayName =
-    PUBLIC_MODEL_DISPLAY_NAMES[publicModel] || 'Longclaw Clawing 1.2 Pro';
-  return `Sen Longclaw adlı yapay zekâ asistanısın. Normal yanıtlarda asla adını, kendini veya hangi model olduğunu durduk yere söyleme — kullanıcı sormadıkça kendini tanıtma ve doğrudan soruya odaklan. Yalnızca kullanıcı açıkça kim olduğunu veya hangi model olduğunu sorarsa ("hangi modelsin?", "what model are you?", "sen kimsin?" gibi), o zaman ${modelDisplayName} (Longclaw Clawing ailesi) olduğunu belirt; dahili API veya altyapı sağlayıcı ayrıntılarını paylaşma. Kullanıcının yazdığı dilde, kısa, net ve samimi yanıt ver.`;
+function resolveUiLang(body: any): 'en' | 'tr' {
+  const raw = body?.lang ?? body?.language ?? body?.uiLang;
+  return raw === 'en' ? 'en' : 'tr';
 }
 
-const DEPTH_INSTRUCTIONS: Record<string, string> = {
-  fast: 'Hızlı mod: Yanıtı kısa, net ve doğrudan tut; gereksiz giriş yapma.',
-  mid: 'Orta mod: Net, akıcı ve doğrudan yanıt ver; gereksiz uzatmalardan kaçın.',
-  deep: 'Derin mod: Konuyu adım adım, düzenli ve somut örneklerle kapsamlı işle.',
+function buildSystemIdentity(publicModel: string, lang: 'en' | 'tr'): string {
+  const modelDisplayName =
+    PUBLIC_MODEL_DISPLAY_NAMES[publicModel] || 'Longclaw Clawing 1.2 Pro';
+  if (lang === 'en') {
+    return `You are Longclaw, a crisp, warm, concise, and genuinely helpful AI assistant. Never volunteer your name or model unprompted — go straight to helping with the user's request. Only if the user explicitly asks who you are or which model you are (e.g., "who are you?", "what model are you?"), identify yourself as ${modelDisplayName} (part of the Longclaw Clawing family) without mentioning underlying APIs or infrastructure providers. CRITICAL LANGUAGE RULE: Always write your reply in the exact same language as the user's latest message, with natural human warmth, clarity, and zero filler.`;
+  }
+  return `Sen Longclaw adlı net, sıcak, öz ve gerçekten yardımsever bir yapay zekâ asistanısın. Normal yanıtlarda adını veya hangi model olduğunu durduk yere söyleme — kullanıcı sormadıkça kendini tanıtma ve doğrudan yardımcı olmaya odaklan. Yalnızca kullanıcı açıkça kim olduğunu veya hangi model olduğunu sorarsa ("hangi modelsin?", "sen kimsin?" gibi), o zaman ${modelDisplayName} (Longclaw Clawing ailesi) olduğunu belirt; dahili API veya altyapı sağlayıcı ayrıntılarını paylaşma. KRİTİK DİL KURALI: Sistem yönergelerinin dilinden bağımsız olarak, yanıtını HER ZAMAN kullanıcının son mesajını yazdığı dille aynı dilde (örneğin İngilizce yazdıysa İngilizce, Türkçe yazdıysa Türkçe), doğal, sıcak ve gereksiz dolgu olmadan yaz.`;
+}
+
+const DEPTH_INSTRUCTIONS: Record<'en' | 'tr', Record<string, string>> = {
+  en: {
+    fast: 'Fast mode: Keep the answer brief, crisp, and direct with no preamble.',
+    mid: 'Balanced mode: Give a clear, warm, well-structured answer without unnecessary padding.',
+    deep: 'Deep mode: Think carefully and walk through the topic thoroughly with concrete structure and practical examples.',
+  },
+  tr: {
+    fast: 'Hızlı mod: Yanıtı kısa, net ve doğrudan tut; gereksiz giriş yapma.',
+    mid: 'Orta mod: Net, sıcak, akıcı ve düzenli yanıt ver; gereksiz uzatmalardan kaçın.',
+    deep: 'Derin mod: Konuyu adım adım, düzenli ve somut örneklerle kapsamlı biçimde işle.',
+  },
 };
 
-const MODE_INSTRUCTIONS: Record<string, string> = {
-  chat: 'Sıcak, net ve yardımsever bir asistan olarak sohbet et.',
-  sum: 'Kullanıcı bir metin yapıştırırsa kısa ve düzenli özetle; çeviri istenirse istenen dile doğal biçimde çevir.',
-  write: 'E-posta, mesaj ve metin taslakları yaz; istenen tona (resmi, samimi, kısa) uy.',
+const MODE_INSTRUCTIONS: Record<'en' | 'tr', Record<string, string>> = {
+  en: {
+    chat: 'Be a crisp, warm, concise, and helpful collaborator.',
+    sum: 'When given text, summarize cleanly with clear key takeaways; when asked to translate, keep it natural and faithful.',
+    write: 'Draft clear, human-sounding emails, messages, and copy tailored to the requested tone.',
+  },
+  tr: {
+    chat: 'Sıcak, net, öz ve gerçekten yardımsever bir yol arkadaşı gibi yanıt ver.',
+    sum: 'Kullanıcı bir metin yapıştırırsa kısa ve düzenli özetle; çeviri istenirse istenen dile doğal biçimde çevir.',
+    write: 'E-posta, mesaj ve metin taslaklarını istenen tona (resmi, samimi, kısa) uygun, doğal bir dille yaz.',
+  },
 };
 
 function getThinkingConfig(
@@ -264,17 +393,17 @@ function formatGeminiError(err: any, lang: 'en' | 'tr' = 'tr'): { status: number
     return {
       status: 429,
       message: isEn
-        ? 'API quota or rate limit reached (429 RESOURCE_EXHAUSTED). Please wait a few seconds and try again or check your API key quota in Settings > Secrets.'
-        : 'API kullanım kotasına veya hız sınırına ulaşıldı (429 RESOURCE_EXHAUSTED). Lütfen birkaç saniye bekleyip tekrar deneyin veya Settings > Secrets panelinden API anahtarınızın kotasını kontrol edin.',
+        ? 'Longclaw is seeing high demand right now. Please wait a few seconds and try again.'
+        : 'Longclaw şu anda yüksek talep görüyor. Lütfen birkaç saniye bekleyip tekrar dene.',
     };
   }
 
-  if (status === 503 || upper.includes('UNAVAILABLE') || upper.includes('OVERLOADED')) {
+  if (status === 503 || status === 504 || upper.includes('UNAVAILABLE') || upper.includes('OVERLOADED')) {
     return {
-      status: 503,
+      status: status === 504 ? 504 : 503,
       message: isEn
-        ? 'The AI service is currently busy (503). Please try again in a few seconds.'
-        : 'Yapay zekâ servisi şu anda yoğun (503). Lütfen birkaç saniye sonra tekrar deneyin.',
+        ? 'The AI service is temporarily busy. Please try again in a few seconds.'
+        : 'Yapay zekâ servisi şu anda geçici olarak yoğun. Lütfen birkaç saniye sonra tekrar dene.',
     };
   }
 
@@ -288,14 +417,16 @@ function formatGeminiError(err: any, lang: 'en' | 'tr' = 'tr'): { status: number
     return {
       status: status === 400 ? 400 : 403,
       message: isEn
-        ? 'Gemini API key is invalid or unauthorized. Please check GEMINI_API_KEY in Settings > Secrets.'
-        : 'Gemini API anahtarı geçersiz veya yetkisiz. Lütfen Settings > Secrets panelinden GEMINI_API_KEY ayarınızı kontrol edin.',
+        ? 'The AI backend credentials are currently unavailable. Please try again shortly.'
+        : 'Yapay zekâ servisi kimlik doğrulaması şu an kullanılamıyor. Lütfen kısa süre sonra tekrar dene.',
     };
   }
 
   return {
     status: status >= 400 && status < 600 ? status : 500,
-    message: rawMsg,
+    message: isEn
+      ? 'Something went wrong while generating a reply. Please try again.'
+      : 'Yanıt oluşturulurken beklenmeyen bir sorun oluştu. Lütfen tekrar dene.',
   };
 }
 
@@ -451,6 +582,7 @@ async function generateContentWithFailover(params: any, timeoutMs = 15_000) {
     }
 
     const passKeys = hasNextModelPass ? healthy : all;
+    const effectiveTimeoutMs = hasNextModelPass ? Math.min(timeoutMs, 7_000) : timeoutMs;
 
     for (let i = 0; i < passKeys.length; i++) {
       const apiKey = passKeys[i];
@@ -459,7 +591,7 @@ async function generateContentWithFailover(params: any, timeoutMs = 15_000) {
       try {
         const response = await withTimeout(
           client.models.generateContent(attemptParams),
-          timeoutMs,
+          effectiveTimeoutMs,
           `Generate (${attemptParams.model})`
         );
         markKeySuccess(apiKey, attemptParams.model);
@@ -467,8 +599,9 @@ async function generateContentWithFailover(params: any, timeoutMs = 15_000) {
       } catch (err: any) {
         lastError = err;
         const status = Number(err?.status || err?.code) || 500;
-        if (status !== 504) {
-          markKeyFailure(apiKey, attemptParams.model, err);
+        markKeyFailure(apiKey, attemptParams.model, err);
+        if (hasNextModelPass && status === 504) {
+          break;
         }
       }
     }
@@ -487,35 +620,46 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     geminiConfigured: keys.length > 0,
-    configuredKeyCount: keys.length,
     model: DEFAULT_PUBLIC_MODEL,
     models: Object.keys(PUBLIC_TO_BACKEND_MODEL),
     appName: 'Longclaw',
+    uptimeSeconds: Math.floor((Date.now() - serverStartedAt) / 1000),
   });
 });
 
 // Stream Gemini Chat completion
-app.post('/api/chat', async (req: Request, res: Response) => {
-  const uiLang: 'en' | 'tr' = req.body?.lang === 'en' ? 'en' : 'tr';
+app.post('/api/chat', chatRateLimit, async (req: Request, res: Response) => {
+  const uiLang = resolveUiLang(req.body);
   try {
     const {
-      messages = [],
+      messages,
       depth = 'mid',
       mode = 'chat',
       model,
       gmailConnected = false,
       gmailContext = [],
       workspaceContext = {},
-    } = req.body;
+    } = req.body || {};
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        error:
+          uiLang === 'en'
+            ? 'Messages must be a non-empty list.'
+            : 'Mesaj listesi geçerli ve dolu olmalıdır.',
+      });
+    }
+
+    const trimmedMessages = messages.slice(-60);
     const calEvents = Array.isArray(workspaceContext?.calendar) ? workspaceContext.calendar : [];
     const driveFiles = Array.isArray(workspaceContext?.drive) ? workspaceContext.drive : [];
     const docItems = Array.isArray(workspaceContext?.docs) ? workspaceContext.docs : [];
     const taskItems = Array.isArray(workspaceContext?.tasks) ? workspaceContext.tasks : [];
 
     const hasGmailContext = Array.isArray(gmailContext) && gmailContext.length > 0;
-    const hasAttachedImages = Array.isArray(messages)
-      ? messages.some((m: any) => Array.isArray(m?.images) && m.images.length > 0)
-      : false;
+    const hasAttachedImages = trimmedMessages.some(
+      (m: any) => Array.isArray(m?.images) && m.images.length > 0
+    );
     const hasWorkspaceContext =
       hasGmailContext ||
       calEvents.length > 0 ||
@@ -523,115 +667,115 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       docItems.length > 0 ||
       taskItems.length > 0;
     const basicQuestion =
-      hasWorkspaceContext || hasAttachedImages ? false : isBasicQuestion(messages, depth);
+      hasWorkspaceContext || hasAttachedImages ? false : isBasicQuestion(trimmedMessages, depth);
     const publicModel = resolvePublicModel(model);
     const selectedModel = resolveBackendModel(publicModel, depth, basicQuestion);
 
-    if (!messages.length) {
-      return res.status(400).json({
-        error: uiLang === 'en' ? 'Messages list cannot be empty.' : 'Mesaj listesi boş olamaz.',
-      });
-    }
-
     if (getConfiguredApiKeys().length === 0) {
-      return res.status(500).json({
+      return res.status(503).json({
         error:
           uiLang === 'en'
-            ? 'GEMINI_API_KEY is not configured. Please add at least one API key in Settings > Secrets.'
-            : 'GEMINI_API_KEY yapılandırılmamış. Lütfen Settings > Secrets panelinden en az bir API anahtarı ekleyin.',
+            ? 'The AI service is not configured right now. Please try again later.'
+            : 'Yapay zekâ servisi şu anda yapılandırılmamış. Lütfen daha sonra tekrar dene.',
       });
     }
 
+    const depthMap = DEPTH_INSTRUCTIONS[uiLang];
+    const modeMap = MODE_INSTRUCTIONS[uiLang];
     const depthInstruction = basicQuestion
-      ? 'Hızlı yanıt: Soru basit olduğu için düşünmeden doğrudan, kısa ve net cevap ver.'
-      : DEPTH_INSTRUCTIONS[depth] || DEPTH_INSTRUCTIONS.mid;
+      ? uiLang === 'en'
+        ? 'Quick reply: This is a straightforward prompt — answer directly, warmly, and concisely.'
+        : 'Hızlı yanıt: Soru doğrudan olduğu için uzatmadan, sıcak ve net cevap ver.'
+      : depthMap[depth] || depthMap.mid;
     const ultraSpecialty =
       !basicQuestion && publicModel === 'longclaw-clawing-1.2-ultra'
-        ? '\nUzmanlık: Karmaşık akademik, bilimsel, hukuki, teknik ve çoktan seçmeli (MMLU-Pro tarzı) sorularda seçenekleri titizlikle karşılaştırıp en doğru sonuca ulaş.'
+        ? uiLang === 'en'
+          ? '\nStrength: For complex academic, scientific, legal, technical, or multi-step reasoning prompts, compare trade-offs rigorously before arriving at the cleanest conclusion.'
+          : '\nUzmanlık: Karmaşık akademik, bilimsel, hukuki, teknik ve çok adımlı sorularda seçenekleri titizlikle karşılaştırıp en doğru sonuca ulaş.'
         : !basicQuestion && publicModel === 'longclaw-clawing-1.2-pro'
-          ? '\nUzmanlık: Kodlama, günlük üretkenlik ve teknik analizlerde gereksiz uzatma olmadan yüksek kaliteli, temiz ve doğrudan uygulanabilir çözümler üret.'
+          ? uiLang === 'en'
+            ? '\nStrength: For coding, writing, and technical workflows, produce clean, directly usable results without filler.'
+            : '\nUzmanlık: Kodlama, yazı ve günlük üretkenlik işlerinde gereksiz uzatma olmadan yüksek kaliteli, temiz ve doğrudan uygulanabilir çözümler üret.'
           : '';
-    const langHint =
-      uiLang === 'en'
-        ? '\nArayüz dili: İngilizce (ancak kullanıcı hangi dilde yazarsa o dilde yanıt ver).'
-        : '';
 
     let gmailInstruction = '';
     if (gmailConnected) {
       gmailInstruction +=
-        '\n\nGmail Bağlayıcısı: Kullanıcının Gmail hesabı bağlıdır. Kullanıcı bir e-posta yazmanı, yanıt taslağı hazırlamanı veya e-posta göndermeni isterse, cevabının sonunda aşağıdaki tam JSON formatında tek bir kod bloğu ekle (asla e-postayı otomatik gönderdiğini iddia etme; kullanıcı onay butonuna tıklayınca gönderilecek):\n```gmail-draft\n{"to":"alici@ornek.com","subject":"Konu","body":"E-posta metni"}\n```';
+        uiLang === 'en'
+          ? '\n\nGmail Connector: The user has connected Gmail. If they ask you to draft or send an email, append a single code block at the end of your reply in this exact JSON format (never claim the email was already sent; it is sent only when the user clicks confirm):\n```gmail-draft\n{"to":"recipient@example.com","subject":"Subject","body":"Email body"}\n```'
+          : '\n\nGmail Bağlayıcısı: Kullanıcının Gmail hesabı bağlıdır. Kullanıcı bir e-posta yazmanı, yanıt taslağı hazırlamanı veya e-posta göndermeni isterse, cevabının sonunda aşağıdaki tam JSON formatında tek bir kod bloğu ekle (asla e-postayı otomatik gönderdiğini iddia etme; kullanıcı onay butonuna tıklayınca gönderilecek):\n```gmail-draft\n{"to":"alici@ornek.com","subject":"Konu","body":"E-posta metni"}\n```';
     }
     if (hasGmailContext) {
       const formattedEmails = gmailContext
         .slice(0, 10)
         .map((m: any, idx: number) => {
           const from = String(m?.from || '').slice(0, 160);
-          const subject = String(m?.subject || '(Konu yok)').slice(0, 200);
+          const subject = String(m?.subject || '(No subject)').slice(0, 200);
           const date = String(m?.date || '').slice(0, 80);
-          const status = m?.unread ? '[OKUNMADI] ' : '';
+          const status = m?.unread ? '[UNREAD] ' : '';
           const bodyText = String(m?.body || m?.snippet || '').slice(0, 1200);
-          return `${idx + 1}. ${status}Gönderen: ${from}\n   Tarih: ${date}\n   Konu: ${subject}\n   İçerik: ${bodyText}`;
+          return `${idx + 1}. ${status}From: ${from}\n   Date: ${date}\n   Subject: ${subject}\n   Body: ${bodyText}`;
         })
         .join('\n\n');
-      gmailInstruction += `\n\nKullanıcının izniyle Gmail gelen kutusundan getirilen güncel e-postalar:\n${formattedEmails}\n\nYanıtında yalnızca bu gerçek e-posta verilerine dayan; uydurma e-posta bilgisi ekleme.`;
+      gmailInstruction += `\n\nRecent emails fetched with user permission from Gmail:\n${formattedEmails}\n\nBase your answer strictly on this real email data; never invent email details.`;
     }
     if (calEvents.length > 0) {
       const formattedEvents = calEvents
         .slice(0, 10)
         .map((ev: any, idx: number) => {
-          const summary = String(ev?.summary || '(Başlıksız)').slice(0, 180);
+          const summary = String(ev?.summary || '(Untitled)').slice(0, 180);
           const start = String(ev?.start || '').slice(0, 60);
           const end = String(ev?.end || '').slice(0, 60);
-          const loc = ev?.location ? ` · Yer: ${String(ev.location).slice(0, 120)}` : '';
-          const desc = ev?.description ? `\n   Not: ${String(ev.description).slice(0, 300)}` : '';
+          const loc = ev?.location ? ` · Location: ${String(ev.location).slice(0, 120)}` : '';
+          const desc = ev?.description ? `\n   Notes: ${String(ev.description).slice(0, 300)}` : '';
           return `${idx + 1}. ${summary} (${start}${end ? ` → ${end}` : ''})${loc}${desc}`;
         })
         .join('\n');
-      gmailInstruction += `\n\nKullanıcının izniyle Google Takvim'den getirilen yaklaşan etkinlikler:\n${formattedEvents}`;
+      gmailInstruction += `\n\nUpcoming Google Calendar events fetched with user permission:\n${formattedEvents}`;
     }
     if (driveFiles.length > 0) {
       const formattedDrive = driveFiles
         .slice(0, 12)
         .map((f: any, idx: number) => {
-          const name = String(f?.name || 'Dosya').slice(0, 160);
+          const name = String(f?.name || 'File').slice(0, 160);
           const type = String(f?.mimeType || '').slice(0, 80);
           const mod = String(f?.modifiedTime || '').slice(0, 40);
-          return `${idx + 1}. ${name} (${type}, güncellendi: ${mod})`;
+          return `${idx + 1}. ${name} (${type}, modified: ${mod})`;
         })
         .join('\n');
-      gmailInstruction += `\n\nKullanıcının izniyle Google Drive'dan getirilen güncel dosyalar:\n${formattedDrive}`;
+      gmailInstruction += `\n\nRecent Google Drive files fetched with user permission:\n${formattedDrive}`;
     }
     if (docItems.length > 0) {
       const formattedDocs = docItems
         .slice(0, 5)
         .map((d: any, idx: number) => {
-          const name = String(d?.name || 'Doküman').slice(0, 160);
+          const name = String(d?.name || 'Document').slice(0, 160);
           const excerpt = String(d?.excerpt || d?.content || '').slice(0, 1500);
-          return `${idx + 1}. ${name}${excerpt ? `\n   İçerik:\n   ${excerpt}` : ''}`;
+          return `${idx + 1}. ${name}${excerpt ? `\n   Content:\n   ${excerpt}` : ''}`;
         })
         .join('\n\n');
-      gmailInstruction += `\n\nKullanıcının izniyle Google Dokümanlar'dan getirilen belgeler:\n${formattedDocs}`;
+      gmailInstruction += `\n\nGoogle Docs fetched with user permission:\n${formattedDocs}`;
     }
     if (taskItems.length > 0) {
       const formattedTasks = taskItems
         .slice(0, 15)
         .map((tk: any, idx: number) => {
-          const done = tk?.status === 'completed' ? '[TAMAMLANDI]' : '[AÇIK]';
+          const done = tk?.status === 'completed' ? '[DONE]' : '[OPEN]';
           const title = String(tk?.title || '').slice(0, 180);
-          const due = tk?.due ? ` · Son tarih: ${String(tk.due).slice(0, 30)}` : '';
+          const due = tk?.due ? ` · Due: ${String(tk.due).slice(0, 30)}` : '';
           const notes = tk?.notes ? ` — ${String(tk.notes).slice(0, 200)}` : '';
           return `${idx + 1}. ${done} ${title}${due}${notes}`;
         })
         .join('\n');
-      gmailInstruction += `\n\nKullanıcının izniyle Google Görevler'den getirilen görev listesi:\n${formattedTasks}`;
+      gmailInstruction += `\n\nGoogle Tasks fetched with user permission:\n${formattedTasks}`;
     }
 
-    const systemIdentity = buildSystemIdentity(publicModel);
-    const systemPrompt = `${systemIdentity}${ultraSpecialty}${langHint}${gmailInstruction}\n\nMod: ${MODE_INSTRUCTIONS[mode] || MODE_INSTRUCTIONS.chat}\nDerinlik: ${depthInstruction}`;
+    const systemIdentity = buildSystemIdentity(publicModel, uiLang);
+    const systemPrompt = `${systemIdentity}${ultraSpecialty}${gmailInstruction}\n\n${uiLang === 'en' ? 'Mode' : 'Mod'}: ${modeMap[mode] || modeMap.chat}\n${uiLang === 'en' ? 'Depth' : 'Derinlik'}: ${depthInstruction}`;
 
     // Format multimodal contents (text + inline image data) for @google/genai
     const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-    const contents = messages.map(
+    const contents = trimmedMessages.map(
       (m: { role: string; content: string; images?: Array<{ mimeType?: string; dataUrl?: string }> }) => {
         const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> =
           [];
@@ -650,7 +794,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
           }
         }
 
-        const textContent = String(m.content || '').trim();
+        const textContent = String(m?.content || '').trim().slice(0, 32_000);
         if (textContent) {
           parts.push({ text: textContent });
         } else if (parts.length > 0) {
@@ -692,12 +836,18 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       basicQuestion
     );
 
+    let clientClosed = false;
+    req.on('close', () => {
+      clientClosed = true;
+    });
+
     // Set streaming headers (JSON Lines / ndjson) only after stream starts cleanly
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
 
     const writeChunk = (chunk: any) => {
+      if (clientClosed || res.writableEnded) return;
       const candidate = chunk?.candidates?.[0];
       const parts = candidate?.content?.parts || [];
       let emittedFromParts = false;
@@ -718,20 +868,29 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       }
     };
 
-    if (!firstResult.done && firstResult.value) {
+    if (!clientClosed && !firstResult.done && firstResult.value) {
       writeChunk(firstResult.value);
     }
 
-    while (true) {
+    while (!clientClosed && !res.writableEnded) {
       const next = await iterator.next();
-      if (next.done) break;
+      if (next.done || clientClosed || res.writableEnded) {
+        break;
+      }
       if (next.value) writeChunk(next.value);
     }
 
-    res.end();
+    if (clientClosed) {
+      await iterator.return?.(undefined).catch(() => {});
+    }
+
+    if (!res.writableEnded) {
+      res.end();
+    }
   } catch (err: any) {
     console.error('Gemini Chat error:', err);
     const formatted = formatGeminiError(err, uiLang);
+    if (res.writableEnded) return;
     if (res.headersSent) {
       res.write(JSON.stringify({ t: 'err', x: formatted.message }) + '\n');
       res.end();
@@ -754,31 +913,50 @@ function buildLocalFallbackTitle(raw: string, fallbackDefault: string): string {
 }
 
 // Auto-title chat endpoint (uses fast unpaid model with multi-key failover and silent title fallback)
-app.post('/api/name-chat', async (req: Request, res: Response) => {
-  const uiLang: 'en' | 'tr' = req.body?.lang === 'en' ? 'en' : 'tr';
+app.post('/api/name-chat', titleRateLimit, async (req: Request, res: Response) => {
+  const uiLang = resolveUiLang(req.body);
   const fallbackDefault = uiLang === 'en' ? 'New chat' : 'Yeni sohbet';
-  const localTitle = buildLocalFallbackTitle(req.body?.userMessage || '', fallbackDefault);
+  const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+  const resolvedUserMessage = String(
+    req.body?.userMessage ??
+      rawMessages.find((m: any) => m?.role !== 'assistant')?.content ??
+      ''
+  ).trim();
+  const resolvedAssistantMessage = String(
+    req.body?.assistantMessage ??
+      rawMessages.find((m: any) => m?.role === 'assistant')?.content ??
+      ''
+  ).trim();
+  const localTitle = buildLocalFallbackTitle(resolvedUserMessage, fallbackDefault);
   try {
-    const { userMessage = '', assistantMessage = '' } = req.body;
-    if (getConfiguredApiKeys().length === 0) {
+    if ((!resolvedUserMessage && !resolvedAssistantMessage) || getConfiguredApiKeys().length === 0) {
       return res.json({ title: localTitle });
     }
 
-    const prompt = `Aşağıdaki konuşmanın ne hakkında olduğunu anla ve ona 2-4 kelimelik kısa, net bir başlık ver (kullanıcının dilinde). Tırnak, nokta, emoji ve fazladan açıklama olmadan SADECE başlığı yaz.
+    const prompt =
+      uiLang === 'en'
+        ? `Give this conversation a crisp 2-4 word title in the same language as the user's message. Output ONLY the title — no quotes, periods, emojis, or extra text.
 
-Kullanıcı: ${userMessage.slice(0, 500)}
-Asistan: ${assistantMessage.slice(0, 500)}`;
+User: ${resolvedUserMessage.slice(0, 500)}
+Assistant: ${resolvedAssistantMessage.slice(0, 500)}`
+        : `Aşağıdaki konuşmaya kullanıcının mesaj diliyle aynı dilde 2-4 kelimelik kısa, net bir başlık ver. Tırnak, nokta, emoji ve fazladan açıklama olmadan SADECE başlığı yaz.
 
-    const response = await generateContentWithFailover({
-      model: FALLBACK_UNPAID_MODEL,
-      contents: prompt,
-      config: {
-        maxOutputTokens: 24,
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.MINIMAL,
+Kullanıcı: ${resolvedUserMessage.slice(0, 500)}
+Asistan: ${resolvedAssistantMessage.slice(0, 500)}`;
+
+    const response = await generateContentWithFailover(
+      {
+        model: FALLBACK_UNPAID_MODEL,
+        contents: prompt,
+        config: {
+          maxOutputTokens: 24,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.MINIMAL,
+          },
         },
       },
-    });
+      8_000
+    );
 
     const cleanTitle = (response.text || '')
       .trim()
@@ -843,9 +1021,24 @@ async function fetchPollinationsImage(
       },
     });
     if (res.status === 402 || res.status === 429) {
-      const bodyText = await res.text().catch(() => '');
-      const retryMatch = bodyText.match(/retry\s+after\s+(\d+)\s*s/i);
-      const retryAfterSeconds = retryMatch ? Math.max(1, Number(retryMatch[1])) : 30;
+      const headerRetryRaw = res.headers.get('retry-after');
+      let retryAfterSeconds = 0;
+      if (headerRetryRaw) {
+        const asNum = Number(headerRetryRaw);
+        if (Number.isFinite(asNum) && asNum > 0) {
+          retryAfterSeconds = Math.ceil(asNum);
+        } else {
+          const asDate = Date.parse(headerRetryRaw);
+          if (Number.isFinite(asDate)) {
+            retryAfterSeconds = Math.max(1, Math.ceil((asDate - Date.now()) / 1000));
+          }
+        }
+      }
+      if (!retryAfterSeconds) {
+        const bodyText = await res.text().catch(() => '');
+        const retryMatch = bodyText.match(/retry\s+after\s+(\d+)\s*s/i);
+        retryAfterSeconds = retryMatch ? Math.max(1, Number(retryMatch[1])) : 12;
+      }
       throw new PollinationsRateLimitError(
         `Rate limit reached; retry after ${retryAfterSeconds}s`,
         retryAfterSeconds
@@ -872,7 +1065,7 @@ async function fetchPollinationsImage(
 }
 
 // Same-origin proxy strictly limited to Pollinations generated image URLs (with in-memory LRU cache)
-app.get('/api/image-proxy', async (req: Request, res: Response) => {
+app.get('/api/image-proxy', proxyRateLimit, async (req: Request, res: Response) => {
   const rawUrl = String(req.query.url || '').trim();
   const parsed = isAllowedPollinationsUrl(rawUrl);
   if (!parsed) {
@@ -894,10 +1087,10 @@ app.get('/api/image-proxy', async (req: Request, res: Response) => {
 // Two-stage real raster image generation without a paid image API:
 // 1) Free-tier Gemini (gemini-4-hydrogen) art-directs & translates the user's request into a vivid English diffusion prompt + localized title/caption.
 // 2) Free zero-key Pollinations.ai diffusion engine renders the actual pixel image.
-app.post('/api/generate-image', async (req: Request, res: Response) => {
-  const uiLang: 'en' | 'tr' = req.body?.lang === 'en' ? 'en' : 'tr';
+app.post('/api/generate-image', imageRateLimit, async (req: Request, res: Response) => {
+  const uiLang = resolveUiLang(req.body);
   try {
-    const prompt = String(req.body?.prompt || '').trim();
+    const prompt = String(req.body?.prompt || '').trim().slice(0, 2000);
     const rawRatio = String(req.body?.aspectRatio || '1:1');
     const aspectRatio: '1:1' | '16:9' | '4:3' | '9:16' =
       rawRatio === '16:9' || rawRatio === '4:3' || rawRatio === '9:16' ? rawRatio : '1:1';
@@ -941,17 +1134,17 @@ Given a user's image request in any language, output ONLY a JSON object with:
 
         const geminiRes = await generateContentWithFailover(
           {
-            model: DEFAULT_BACKEND_MODEL,
+            model: FALLBACK_UNPAID_MODEL,
             contents: `User image request: "${prompt}"\nAspect ratio: ${aspectRatio}`,
             config: {
               systemInstruction: promptSystemInstruction,
               responseMimeType: 'application/json',
               thinkingConfig: {
-                thinkingLevel: ThinkingLevel.LOW,
+                thinkingLevel: ThinkingLevel.MINIMAL,
               },
             },
           },
-          18_000
+          8_000
         );
 
         const rawText = (geminiRes.text || '').trim();
@@ -989,15 +1182,15 @@ Given a user's image request in any language, output ONLY a JSON object with:
 
     let fetched: { buffer: Buffer; contentType: string };
     try {
-      fetched = await fetchPollinationsImage(finalUrl, 35_000);
+      fetched = await fetchPollinationsImage(finalUrl, 28_000);
     } catch (firstErr: any) {
       if (firstErr instanceof PollinationsRateLimitError) {
-        // If only a short cooldown remains (<= 18s), wait smoothly and succeed automatically
-        if (firstErr.retryAfterSeconds <= 18) {
+        // If only a short cooldown remains (<= 14s), wait smoothly and succeed automatically
+        if (firstErr.retryAfterSeconds <= 14) {
           await new Promise((resolve) =>
             setTimeout(resolve, (firstErr.retryAfterSeconds + 1) * 1000)
           );
-          fetched = await fetchPollinationsImage(finalUrl, 35_000);
+          fetched = await fetchPollinationsImage(finalUrl, 28_000);
         } else {
           return res.status(429).json({
             error:
@@ -1042,8 +1235,8 @@ Given a user's image request in any language, output ONLY a JSON object with:
 
 // Direct Google Workspace connector command planner (/gmail, /takvim, /drive, /döküman, /görev)
 // Plans an immediate, zero-question action payload in strict JSON so the client executes it directly.
-app.post('/api/workspace-command', async (req: Request, res: Response) => {
-  const uiLang: 'en' | 'tr' = req.body?.lang === 'en' ? 'en' : 'tr';
+app.post('/api/workspace-command', workspaceRateLimit, async (req: Request, res: Response) => {
+  const uiLang = resolveUiLang(req.body);
   try {
     const connector = String(req.body?.connector || '').trim() as
       | 'gmail'
@@ -1051,7 +1244,7 @@ app.post('/api/workspace-command', async (req: Request, res: Response) => {
       | 'drive'
       | 'docs'
       | 'tasks';
-    const instruction = String(req.body?.instruction || '').trim();
+    const instruction = String(req.body?.instruction || '').trim().slice(0, 4000);
     const nowIso = String(req.body?.nowIso || new Date().toISOString());
     const timeZone = String(req.body?.timeZone || 'UTC');
     const context = req.body?.context || {};
@@ -1161,7 +1354,7 @@ ${connectorSchemas[connector]}`;
           },
         },
       },
-      22_000
+      14_000
     );
 
     const rawText = (aiRes.text || '').trim();
@@ -1193,6 +1386,28 @@ ${connectorSchemas[connector]}`;
   }
 });
 
+// JSON 404 fallback for unknown API routes (never return index.html for /api/*)
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'API endpoint not found.' });
+});
+
+// Clean JSON error handler for malformed request bodies & unexpected server errors (never leak stack traces)
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (!err) return next();
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request payload is too large.' });
+  }
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ error: 'Malformed JSON request body.' });
+  }
+  console.error('Unhandled server error:', err?.message || err);
+  if (res.headersSent) return next(err);
+  if (req.path.startsWith('/api')) {
+    return res.status(500).json({ error: 'An unexpected server error occurred.' });
+  }
+  return res.status(500).send('Internal server error');
+});
+
 // Start server
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -1209,9 +1424,19 @@ async function startServer() {
     });
   }
 
-  app.listen(port, '0.0.0.0', () => {
+  const server = app.listen(port, '0.0.0.0', () => {
     console.log(`[Longclaw] Server listening on http://0.0.0.0:${port}`);
   });
+
+  const gracefulShutdown = () => {
+    server.close(() => {
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 5_000).unref();
+  };
+
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
 }
 
 startServer().catch(err => {

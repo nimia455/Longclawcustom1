@@ -20,6 +20,7 @@ import {
   getFirestore,
   doc,
   getDoc,
+  getDocs,
   getDocFromServer,
   collection,
   onSnapshot,
@@ -438,6 +439,26 @@ export async function syncUserProfile(user: User) {
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteUserProfileAndCommands(userId: string) {
+  try {
+    const cmdQuery = query(
+      collection(db, 'users', userId, 'commands'),
+      where('userId', '==', userId)
+    );
+    const cmdSnap = await getDocs(cmdQuery);
+    await Promise.all(
+      cmdSnap.docs.map((d) => deleteDoc(doc(db, 'users', userId, 'commands', d.id)).catch(() => {}))
+    );
+  } catch {
+    // Best-effort cleanup
+  }
+  try {
+    await deleteDoc(doc(db, 'users', userId));
+  } catch {
+    // Best-effort cleanup
   }
 }
 

@@ -69,12 +69,12 @@ export function getBuiltInCommands(lang: Language): SlashCommandItem[] {
     },
     {
       id: 'builtin-takvim',
-      name: 'takvim',
-      aliases: ['calendar', 'etkinlik'],
+      name: isTr ? 'takvim' : 'calendar',
+      aliases: isTr ? ['calendar', 'etkinlik'] : ['takvim', 'event', 'etkinlik'],
       description: isTr
         ? 'Google Takvim’e doğrudan etkinlik ekle, güncelle veya programını gör'
         : 'Create or manage Google Calendar events directly',
-      usage: isTr ? '/takvim <istek>' : '/takvim <request>',
+      usage: isTr ? '/takvim <istek>' : '/calendar <request>',
       isCustom: false,
       kind: 'connector',
       connectorId: 'calendar',
@@ -83,7 +83,7 @@ export function getBuiltInCommands(lang: Language): SlashCommandItem[] {
     {
       id: 'builtin-drive',
       name: 'drive',
-      aliases: ['dosya'],
+      aliases: ['dosya', 'files'],
       description: isTr
         ? 'Google Drive’da klasör/dosya oluştur veya dosyalarını bul'
         : 'Create Drive folders/files or search your Drive directly',
@@ -95,12 +95,12 @@ export function getBuiltInCommands(lang: Language): SlashCommandItem[] {
     },
     {
       id: 'builtin-dokuman',
-      name: 'döküman',
-      aliases: ['dokuman', 'docs', 'doc', 'belge'],
+      name: isTr ? 'döküman' : 'docs',
+      aliases: isTr ? ['dokuman', 'docs', 'doc', 'belge'] : ['döküman', 'dokuman', 'doc', 'belge'],
       description: isTr
         ? 'Google Dokümanlar’da doğrudan yeni belge yaz veya mevcut belgeyi oku'
         : 'Create and write a Google Doc or read existing docs directly',
-      usage: isTr ? '/döküman <istek>' : '/döküman <request>',
+      usage: isTr ? '/döküman <istek>' : '/docs <request>',
       isCustom: false,
       kind: 'connector',
       connectorId: 'docs',
@@ -108,12 +108,12 @@ export function getBuiltInCommands(lang: Language): SlashCommandItem[] {
     },
     {
       id: 'builtin-gorev',
-      name: 'görev',
-      aliases: ['gorev', 'tasks', 'task'],
+      name: isTr ? 'görev' : 'tasks',
+      aliases: isTr ? ['gorev', 'tasks', 'task'] : ['görev', 'gorev', 'task'],
       description: isTr
         ? 'Google Görevler’e doğrudan görev ekle, tamamla veya listele'
         : 'Add, complete, or list Google Tasks directly',
-      usage: isTr ? '/görev <istek>' : '/görev <request>',
+      usage: isTr ? '/görev <istek>' : '/tasks <request>',
       isCustom: false,
       kind: 'connector',
       connectorId: 'tasks',
