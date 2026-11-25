@@ -33,6 +33,7 @@ import {
   Terminal,
   User as UserIcon,
   Mic,
+  AudioLines,
   Loader2,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -71,6 +72,7 @@ import {
   PendingGmailAction,
 } from './ConnectorsModal';
 import { FontPreference, SettingsModal, SettingsTab } from './SettingsModal';
+import { VoiceChatOverlay } from './VoiceChatOverlay';
 import {
   SlashCommandItem,
   filterSlashCommands,
@@ -287,8 +289,17 @@ export function ChatWorkspace({
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingThoughts, setStreamingThoughts] = useState('');
   const [streamingText, setStreamingText] = useState('');
+  const [isVoiceChatOpen, setIsVoiceChatOpen] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const voiceErrorTimerRef = useRef<number | null>(null);
+  const chatsRef = useRef(chats);
+  const currentChatIdRef = useRef(currentChatId);
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+  useEffect(() => {
+    currentChatIdRef.current = currentChatId;
+  }, [currentChatId]);
 
   const showVoiceError = (msg: string) => {
     setVoiceError(msg);
@@ -534,17 +545,66 @@ export function ChatWorkspace({
     return t.common.defaultUser;
   })();
 
+  const sanitizeSafePhotoUrl = (raw: string): string => {
+    try {
+      const parsed = new URL(raw);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.toString() : '';
+    } catch {
+      return '';
+    }
+  };
+
   const effectivePhotoUrl = (() => {
     void userVersion;
-    if (user?.photoURL?.trim()) return user.photoURL.trim();
+    if (user?.photoURL?.trim()) return sanitizeSafePhotoUrl(user.photoURL.trim());
     if (!user) {
       try {
         const guestPhoto = localStorage.getItem('lc_guest_photo')?.trim();
-        if (guestPhoto) return guestPhoto;
+        if (guestPhoto) return sanitizeSafePhotoUrl(guestPhoto);
       } catch {}
     }
     return '';
   })();
+
+  const handleCommitVoiceExchange = (userText: string, assistantText: string) => {
+    const existingId = currentChatIdRef.current;
+    const existingChat = existingId
+      ? chatsRef.current.find((c) => c.id === existingId) || null
+      : null;
+    const targetChat = existingChat || onCreateChat(depth);
+    currentChatIdRef.current = targetChat.id;
+
+    const now = Date.now();
+    const userMsg: ChatMessage = {
+      id: `m-v-u-${now}-${Math.random().toString(36).slice(2, 6)}`,
+      role: 'user',
+      content: userText,
+      createdAt: now,
+    };
+    const assistantMsg: ChatMessage = {
+      id: `m-v-a-${now + 1}-${Math.random().toString(36).slice(2, 6)}`,
+      role: 'assistant',
+      content: assistantText,
+      createdAt: now + 1,
+    };
+
+    const nextMessages = [...targetChat.messages, userMsg, assistantMsg];
+    const shouldName =
+      targetChat.messages.length === 0 || isDefaultChatTitle(targetChat.title);
+    const quickTitle = shouldName
+      ? userText.trim().slice(0, 48) + (userText.trim().length > 48 ? '…' : '')
+      : undefined;
+
+    chatsRef.current = chatsRef.current.some((c) => c.id === targetChat.id)
+      ? chatsRef.current.map((c) =>
+          c.id === targetChat.id
+            ? { ...c, messages: nextMessages, ...(quickTitle ? { title: quickTitle } : {}) }
+            : c
+        )
+      : [{ ...targetChat, messages: nextMessages, ...(quickTitle ? { title: quickTitle } : {}) }, ...chatsRef.current];
+
+    void onUpdateChatMessages(targetChat.id, nextMessages, quickTitle);
+  };
 
   useEffect(() => {
     setSidebarAvatarFailed(false);
@@ -3187,6 +3247,24 @@ export function ChatWorkspace({
                     </button>
                   )}
 
+                  {!isStreaming && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVoiceError(null);
+                        if (voice.isRecording || voice.isTranscribing) {
+                          voice.cancelRecording();
+                        }
+                        setIsVoiceChatOpen(true);
+                      }}
+                      aria-label={cText.voiceChat.openTitle}
+                      title={cText.voiceChat.openTitle}
+                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors cursor-pointer text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]"
+                    >
+                      <AudioLines className="w-4 h-4" />
+                    </button>
+                  )}
+
                   {isStreaming ? (
                     <button
                       type="button"
@@ -3405,6 +3483,17 @@ export function ChatWorkspace({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <VoiceChatOverlay
+        isOpen={isVoiceChatOpen}
+        onClose={() => setIsVoiceChatOpen(false)}
+        lang={lang}
+        history={(currentChat?.messages || []).slice(-12).map((m) => ({
+          role: m.role,
+          content: m.content,
+        }))}
+        onCommitExchange={handleCommitVoiceExchange}
+      />
     </div>
   );
 }

@@ -1453,11 +1453,11 @@ export function ConnectorsModal({
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  {file.webViewLink && (
+                                  {file.webViewLink && /^https?:\/\//i.test(file.webViewLink.trim()) && (
                                     <a
-                                      href={file.webViewLink}
+                                      href={file.webViewLink.trim()}
                                       target="_blank"
-                                      rel="noreferrer"
+                                      rel="noopener noreferrer"
                                       className="p-2 rounded-full text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors"
                                       title={isTr ? 'Drive’da aç' : 'Open in Drive'}
                                     >

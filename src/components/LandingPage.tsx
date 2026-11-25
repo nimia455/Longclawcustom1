@@ -29,7 +29,6 @@ import {
 import { LegalDocType } from './LegalModal';
 import { FAMILY_MODELS } from '../lib/models';
 import { BenchmarkPage } from './BenchmarkPage';
-import { ApiPortal } from './ApiPortal';
 import { Language, TRANSLATIONS } from '../lib/i18n';
 import {
   EDITORIAL_EASE,
@@ -57,10 +56,9 @@ interface LandingPageProps {
   onChangeLang: (lang: Language) => void;
 }
 
-type NavTarget = 'top' | 'gun' | 'modlar' | 'sss' | 'benchmarks' | 'api';
+type NavTarget = 'top' | 'gun' | 'modlar' | 'sss' | 'benchmarks';
 
 export function LandingPage({
-  user = null,
   onOpenAuth,
   onOpenLegal,
   theme,
@@ -74,7 +72,7 @@ export function LandingPage({
   const depthAnswers = l.depthAnswers;
   const prefersReducedMotion = useReducedMotion();
 
-  const [activePage, setActivePage] = useState<'home' | 'benchmarks' | 'api'>('home');
+  const [activePage, setActivePage] = useState<'home' | 'benchmarks'>('home');
   const [activeSection, setActiveSection] = useState<'top' | 'gun' | 'modlar' | 'sss'>('top');
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
 
@@ -141,13 +139,6 @@ export function LandingPage({
     }
   };
 
-  const openApiPortal = () => {
-    setActivePage('api');
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
   const navigateToSection = (sectionId: 'top' | 'gun' | 'modlar' | 'sss') => {
     setActivePage('home');
     setActiveSection(sectionId);
@@ -164,11 +155,7 @@ export function LandingPage({
   };
 
   const activeNavKey: NavTarget =
-    activePage === 'benchmarks'
-      ? 'benchmarks'
-      : activePage === 'api'
-        ? 'api'
-        : activeSection;
+    activePage === 'benchmarks' ? 'benchmarks' : activeSection;
 
   const navItems: Array<{
     key: NavTarget;
@@ -178,7 +165,6 @@ export function LandingPage({
     { key: 'gun', label: t.nav.whatItDoes, onClick: () => navigateToSection('gun') },
     { key: 'modlar', label: t.nav.depths, onClick: () => navigateToSection('modlar') },
     { key: 'benchmarks', label: t.nav.benchmarks, onClick: openBenchmarks },
-    { key: 'api', label: t.nav.api, onClick: openApiPortal },
     { key: 'sss', label: t.nav.faq, onClick: () => navigateToSection('sss') },
   ];
 
@@ -342,23 +328,6 @@ export function LandingPage({
           >
             <BenchmarkPage
               lang={lang}
-              onBack={() => navigateToSection('top')}
-              onOpenAuth={onOpenAuth}
-            />
-          </motion.div>
-        ) : activePage === 'api' ? (
-          <motion.div
-            key="api-view"
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={prefersReducedMotion ? undefined : { opacity: 0, y: -8 }}
-            transition={{ duration: 0.28, ease: EDITORIAL_EASE }}
-            className="relative z-10"
-          >
-            <ApiPortal
-              user={user}
-              lang={lang}
-              mode="page"
               onBack={() => navigateToSection('top')}
               onOpenAuth={onOpenAuth}
             />
@@ -856,13 +825,6 @@ export function LandingPage({
                 className="block py-0.5 hover:text-[var(--tx)] transition-colors text-left cursor-pointer"
               >
                 {l.benchmarksCta}
-              </button>
-              <button
-                type="button"
-                onClick={openApiPortal}
-                className="block py-0.5 hover:text-[var(--tx)] transition-colors text-left cursor-pointer"
-              >
-                Longclaw API
               </button>
               <button
                 type="button"

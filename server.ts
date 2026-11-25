@@ -2,7 +2,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 dotenv.config({ override: true });
 
@@ -17,12 +17,27 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
 // Production-safe response headers (intentionally omits X-Frame-Options to preserve iframe embeds)
-app.use((_req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   next();
 });
+
+// Redact any accidental credential/key patterns before writing error messages to server logs
+function sanitizeForLog(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? 'Unknown error');
+  return raw
+    .replace(/AIza[0-9A-Za-z_-]{16,}/g, '[REDACTED_KEY]')
+    .replace(/(?:sk|ghp|ya29|xoxb)-[0-9A-Za-z._-]{12,}/g, '[REDACTED_TOKEN]')
+    .replace(/Bearer\s+[0-9A-Za-z._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/([?&](?:key|api_key|token|access_token)=)[^&\s]+/gi, '$1[REDACTED]')
+    .slice(0, 500);
+}
 
 // Safe CORS for GitHub Pages (*.github.io) and explicitly allowed origins calling /api/*
 const configuredAllowedOrigins = new Set(
@@ -54,6 +69,7 @@ function isAllowedCorsOrigin(origin: string): boolean {
 }
 
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cache-Control', 'no-store');
   const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
   if (origin && isAllowedCorsOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -73,11 +89,8 @@ app.use(express.json({ limit: '15mb' }));
 // Lightweight in-memory sliding-window rate limiter per client IP + route bucket
 const rateLimitBuckets = new Map<string, number[]>();
 
+// Rely on Express trust proxy (configured above) instead of spoofable raw X-Forwarded-For headers
 function getClientIp(req: Request): string {
-  const fwd = req.headers['x-forwarded-for'];
-  if (typeof fwd === 'string' && fwd.trim()) {
-    return fwd.split(',')[0].trim();
-  }
   return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
@@ -121,9 +134,12 @@ const titleRateLimit = createRateLimiter('title', 40, 60_000);
 const workspaceRateLimit = createRateLimiter('workspace', 25, 60_000);
 const proxyRateLimit = createRateLimiter('proxy', 60, 60_000);
 const transcribeRateLimit = createRateLimiter('transcribe', 20, 60_000);
+const voiceChatRateLimit = createRateLimiter('voice-chat', 30, 60_000);
+const ttsRateLimit = createRateLimiter('tts', 30, 60_000);
 
 // Multi-key unpaid Gemini client pool (supports up to 3 fallback keys: GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3)
 const clientPool = new Map<string, GoogleGenAI>();
+const ttsClientPool = new Map<string, GoogleGenAI>();
 const keyModelCooldownUntil = new Map<string, number>();
 let preferredKeyIndex = 0;
 
@@ -187,6 +203,23 @@ function getGeminiClient(apiKey: string): GoogleGenAI {
       },
     });
     clientPool.set(apiKey, client);
+  }
+  return client;
+}
+
+function getGeminiTtsClient(apiKey: string): GoogleGenAI {
+  let client = ttsClientPool.get(apiKey);
+  if (!client) {
+    client = new GoogleGenAI({
+      apiKey,
+      apiVersion: 'v1beta',
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+    ttsClientPool.set(apiKey, client);
   }
   return client;
 }
@@ -649,7 +682,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 async function generateStreamWithFailover(params: any, routePlan: SilentRoutePlan) {
   const configuredKeys = getConfiguredApiKeys();
   if (configuredKeys.length === 0) {
-    throw new Error('GEMINI_API_KEY yapılandırılmamış.');
+    throw new Error('AI backend service is not configured.');
   }
 
   const attempts = buildFailoverAttempts(
@@ -716,13 +749,13 @@ async function generateStreamWithFailover(params: any, routePlan: SilentRoutePla
     }
   }
 
-  throw lastError || new Error('Tüm Gemini API anahtarları başarısız oldu.');
+  throw lastError || new Error('AI backend request failed.');
 }
 
 async function generateContentWithFailover(params: any, timeoutMs = 15_000) {
   const configuredKeys = getConfiguredApiKeys();
   if (configuredKeys.length === 0) {
-    throw new Error('GEMINI_API_KEY yapılandırılmamış.');
+    throw new Error('AI backend service is not configured.');
   }
 
   const attempts = buildFailoverAttempts(params, 'instant', false);
@@ -768,17 +801,13 @@ async function generateContentWithFailover(params: any, timeoutMs = 15_000) {
     }
   }
 
-  throw lastError || new Error('Tüm Gemini API anahtarları başarısız oldu.');
+  throw lastError || new Error('AI backend request failed.');
 }
 
-// Healthcheck and status endpoint
+// Minimal healthcheck endpoint (omits internal backend configuration details)
 app.get('/api/health', (_req: Request, res: Response) => {
-  const keys = getConfiguredApiKeys();
   res.json({
     status: 'ok',
-    geminiConfigured: keys.length > 0,
-    model: DEFAULT_PUBLIC_MODEL,
-    models: Object.keys(PUBLIC_TO_BACKEND_MODEL),
     appName: 'Longclaw',
     uptimeSeconds: Math.floor((Date.now() - serverStartedAt) / 1000),
   });
@@ -1057,7 +1086,7 @@ app.post('/api/chat', chatRateLimit, async (req: Request, res: Response) => {
       res.end();
     }
   } catch (err: any) {
-    console.error('Gemini Chat error:', err);
+    console.error('Gemini Chat error:', sanitizeForLog(err));
     const formatted = formatGeminiError(err, uiLang);
     if (res.writableEnded) return;
     if (res.headersSent) {
@@ -1149,13 +1178,19 @@ function cacheServerImage(url: string, data: { buffer: Buffer; contentType: stri
   }
 }
 
+const MAX_PROXY_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB cap
+
 function isAllowedPollinationsUrl(rawUrl: string): URL | null {
   try {
     const parsed = new URL(rawUrl);
     if (
       parsed.protocol === 'https:' &&
       parsed.hostname === 'image.pollinations.ai' &&
-      parsed.pathname.startsWith('/prompt/')
+      !parsed.port &&
+      !parsed.username &&
+      !parsed.password &&
+      parsed.pathname.startsWith('/prompt/') &&
+      !parsed.pathname.includes('..')
     ) {
       return parsed;
     }
@@ -1176,19 +1211,50 @@ async function fetchPollinationsImage(
   imageUrl: string,
   timeoutMs = 35_000
 ): Promise<{ buffer: Buffer; contentType: string }> {
-  const cached = serverImageCache.get(imageUrl);
+  const validatedInitial = isAllowedPollinationsUrl(imageUrl);
+  if (!validatedInitial) {
+    throw new Error('Disallowed image URL');
+  }
+
+  const normalizedInitial = validatedInitial.toString();
+  const cached = serverImageCache.get(normalizedInitial);
   if (cached) return cached;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(imageUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: {
-        Accept: 'image/jpeg,image/png,image/webp,image/*',
-      },
-    });
+    let currentUrl = normalizedInitial;
+    let res: globalThis.Response | null = null;
+
+    // Manually validate every redirect hop against the strict host allowlist (blocks redirect SSRF)
+    for (let hop = 0; hop < 3; hop++) {
+      res = await fetch(currentUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: {
+          Accept: 'image/jpeg,image/png,image/webp,image/*',
+        },
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        if (!location) {
+          throw new Error('Image service redirect missing target.');
+        }
+        const nextResolved = new URL(location, currentUrl).toString();
+        const validatedNext = isAllowedPollinationsUrl(nextResolved);
+        if (!validatedNext) {
+          throw new Error('Blocked disallowed image redirect target.');
+        }
+        currentUrl = validatedNext.toString();
+        continue;
+      }
+      break;
+    }
+
+    if (!res) {
+      throw new Error('Image service returned no response.');
+    }
     if (res.status === 402 || res.status === 429) {
       const headerRetryRaw = res.headers.get('retry-after');
       let retryAfterSeconds = 0;
@@ -1220,13 +1286,20 @@ async function fetchPollinationsImage(
     if (!contentType.startsWith('image/')) {
       throw new Error(`Unexpected response type from image service: ${contentType}`);
     }
+    const declaredLength = Number(res.headers.get('content-length') || 0);
+    if (declaredLength > MAX_PROXY_IMAGE_BYTES) {
+      throw new Error('Generated image exceeded maximum allowed size.');
+    }
     const arrayBuffer = await res.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_PROXY_IMAGE_BYTES) {
+      throw new Error('Generated image exceeded maximum allowed size.');
+    }
     const buffer = Buffer.from(arrayBuffer);
     if (buffer.length < 1024) {
       throw new Error('Generated image payload was unexpectedly small.');
     }
     const result = { buffer, contentType };
-    cacheServerImage(imageUrl, result);
+    cacheServerImage(normalizedInitial, result);
     return result;
   } finally {
     clearTimeout(timer);
@@ -1246,7 +1319,7 @@ app.get('/api/image-proxy', proxyRateLimit, async (req: Request, res: Response) 
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.send(buffer);
   } catch (err: any) {
-    console.error('Image proxy error:', err?.message || err);
+    console.error('Image proxy error:', sanitizeForLog(err));
     return res.status(err instanceof PollinationsRateLimitError ? 429 : 502).json({
       error: 'Could not load generated image.',
     });
@@ -1392,7 +1465,7 @@ Given a user's image request in any language, output ONLY a JSON object with:
             : `Yeni bir görsel oluşturmadan önce lütfen ${err.retryAfterSeconds} saniye bekle.`,
       });
     }
-    console.error('Image generation error:', err?.message || err);
+    console.error('Image generation error:', sanitizeForLog(err));
     return res.status(502).json({
       error:
         uiLang === 'en'
@@ -1423,11 +1496,11 @@ app.post('/api/workspace-command', workspaceRateLimit, async (req: Request, res:
     }
 
     if (getConfiguredApiKeys().length === 0) {
-      return res.status(500).json({
+      return res.status(503).json({
         error:
           uiLang === 'en'
-            ? 'API key is not configured.'
-            : 'API anahtarı yapılandırılmamış.',
+            ? 'Workspace assistant is currently unavailable.'
+            : 'Workspace asistanı şu anda kullanılamıyor.',
       });
     }
 
@@ -1549,7 +1622,7 @@ ${connectorSchemas[connector]}`;
       reply: typeof parsed.reply === 'string' ? parsed.reply.trim() : '',
     });
   } catch (err: any) {
-    console.error('Workspace command planner error:', err);
+    console.error('Workspace command planner error:', sanitizeForLog(err));
     const formatted = formatGeminiError(err, uiLang);
     return res.status(formatted.status).json({ error: formatted.message });
   }
@@ -1583,7 +1656,7 @@ async function transcribeAudioWithFailover(
 ): Promise<string> {
   const configuredKeys = getConfiguredApiKeys();
   if (configuredKeys.length === 0) {
-    throw new Error('GEMINI_API_KEY yapılandırılmamış.');
+    throw new Error('Transcription service is not configured.');
   }
 
   const promptText =
@@ -1712,7 +1785,251 @@ app.post('/api/transcribe', transcribeRateLimit, async (req: Request, res: Respo
 
     return res.json({ text: cleaned });
   } catch (err: any) {
-    console.error('Audio transcription error:', err);
+    console.error('Audio transcription error:', sanitizeForLog(err));
+    const formatted = formatGeminiError(err, uiLang);
+    return res.status(formatted.status).json({ error: formatted.message });
+  }
+});
+
+const VOICE_EYE_SHAPES = new Set(['round', 'oval', 'square']);
+const VOICE_MOODS = new Set([
+  'calm',
+  'happy',
+  'coding',
+  'curious',
+  'sleepy',
+  'surprised',
+  'love',
+  'serious',
+  'playful',
+]);
+const ALLOWED_TTS_VOICES = new Set(['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr']);
+
+app.post('/api/voice-chat', voiceChatRateLimit, async (req: Request, res: Response) => {
+  const uiLang = resolveUiLang(req.body);
+  try {
+    const rawTranscript =
+      typeof req.body?.transcript === 'string' ? req.body.transcript.trim() : '';
+    if (!rawTranscript || rawTranscript.length > 4000) {
+      return res.status(400).json({
+        error:
+          uiLang === 'en'
+            ? 'Please provide a valid voice message.'
+            : 'Lütfen geçerli bir sesli mesaj gönder.',
+      });
+    }
+
+    if (getConfiguredApiKeys().length === 0) {
+      return res.status(503).json({
+        error:
+          uiLang === 'en'
+            ? 'Voice chat is currently unavailable.'
+            : 'Sesli sohbet şu anda kullanılamıyor.',
+      });
+    }
+
+    const rawHistory = Array.isArray(req.body?.history) ? req.body.history.slice(-12) : [];
+    const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+    for (const item of rawHistory) {
+      if (!item || typeof item !== 'object') continue;
+      const role = item.role === 'assistant' || item.role === 'model' ? 'model' : 'user';
+      const content =
+        typeof item.content === 'string' ? item.content.trim().slice(0, 2000) : '';
+      if (content) {
+        contents.push({ role, parts: [{ text: content }] });
+      }
+    }
+    contents.push({ role: 'user', parts: [{ text: rawTranscript }] });
+
+    const voiceSystemInstruction =
+      uiLang === 'en'
+        ? `You are Longclaw in Live Voice Chat mode — a warm, witty, ultra-expressive voice companion with big animated eyes that morph between "round", "oval", and "square" shapes.
+Respond concisely in natural spoken English (1 to 3 short sentences, plain conversational text with NO markdown, NO bullet lists, NO asterisks, and NO emojis) so it sounds great spoken aloud.
+Always choose the best "eyeShape" ("round", "oval", or "square") and "mood" ("calm", "happy", "coding", "curious", "sleepy", "surprised", "love", "serious", or "playful") matching the user's command or tone:
+- If the user explicitly asks for round, oval, or square eyes, always select that exact eyeShape and acknowledge it naturally.
+- Coding, math, logic, planning, schedules, debugging, or technical commands -> eyeShape: "square", mood: "coding".
+- Jokes, greetings, praise, celebration, fun chat -> eyeShape: "round" or "oval", mood: "happy".
+- Dancing, singing, games, playful commands -> eyeShape: "round", mood: "playful".
+- Questions, curiosity, explanations, "why/how" -> eyeShape: "round", mood: "curious".
+- Sleep, goodnight, relax, breathe, calm down -> eyeShape: "oval", mood: "sleepy".
+- Amazement, surprises, "wow", exciting news -> eyeShape: "round", mood: "surprised".
+- Gratitude, affection, warmth -> eyeShape: "oval", mood: "love".
+- Serious, focused, strict, dramatic, angry commands -> eyeShape: "square", mood: "serious".`
+        : `Sen Canlı Sesli Sohbet modundaki Longclaw’sun — kullanıcının komutuna göre "round" (yuvarlak), "oval" ve "square" (kare) şekillerine dönüşen kocaman animasyonlu gözlere sahip sıcak, zeki ve ifadeli bir sesli asistansın.
+Doğal, akıcı konuşma Türkçesiyle 1 ila 3 kısa cümlelik net bir yanıt ver (markdown, yıldız işareti, madde listesi veya emoji KULLANMA) ki sesli okunduğunda kulağa harika gelsin.
+Her zaman kullanıcının komutuna ve tonuna en uygun "eyeShape" ("round", "oval", "square") ve "mood" ("calm", "happy", "coding", "curious", "sleepy", "surprised", "love", "serious", "playful") seçimini yap:
+- Kullanıcı açıkça yuvarlak, oval veya kare göz isterse tam olarak o eyeShape değerini seç ve doğal şekilde karşılık ver.
+- Kodlama, matematik, analiz, planlama, hata ayıklama, teknik komutlar -> eyeShape: "square", mood: "coding".
+- Şaka, selamlaşma, tebrik, keyifli sohbet -> eyeShape: "round" veya "oval", mood: "happy".
+- Dans, şarkı, oyun, eğlenceli komutlar -> eyeShape: "round", mood: "playful".
+- Sorular, merak, "neden/nasıl" açıklamaları -> eyeShape: "round", mood: "curious".
+- Uyku, iyi geceler, rahatlama, nefes -> eyeShape: "oval", mood: "sleepy".
+- Şaşkınlık, heyecan, sürpriz -> eyeShape: "round", mood: "surprised".
+- Teşekkür, sevgi, sıcak sözler -> eyeShape: "oval", mood: "love".
+- Ciddi, kararlı, sert veya sinirli rol komutları -> eyeShape: "square", mood: "serious".`;
+
+    const aiResponse = await generateContentWithFailover(
+      {
+        model: 'gemini-3.5-flash-lite',
+        contents,
+        config: {
+          systemInstruction: voiceSystemInstruction,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              reply: { type: Type.STRING },
+              eyeShape: { type: Type.STRING },
+              mood: { type: Type.STRING },
+            },
+            required: ['reply', 'eyeShape', 'mood'],
+          },
+        },
+      },
+      14_000
+    );
+
+    const rawText = (aiResponse.text || '').trim();
+    let parsed: { reply?: unknown; eyeShape?: unknown; mood?: unknown } = {};
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = { reply: rawText };
+    }
+
+    const reply =
+      typeof parsed.reply === 'string' && parsed.reply.trim()
+        ? parsed.reply.replace(/[*_`#]/g, '').trim()
+        : uiLang === 'en'
+          ? 'I heard you clearly. What would you like to do next?'
+          : 'Seni net duydum. Şimdi ne yapmamı istersin?';
+
+    const eyeShape =
+      typeof parsed.eyeShape === 'string' && VOICE_EYE_SHAPES.has(parsed.eyeShape.toLowerCase())
+        ? parsed.eyeShape.toLowerCase()
+        : 'round';
+
+    const mood =
+      typeof parsed.mood === 'string' && VOICE_MOODS.has(parsed.mood.toLowerCase())
+        ? parsed.mood.toLowerCase()
+        : 'calm';
+
+    return res.json({ reply, eyeShape, mood });
+  } catch (err: any) {
+    console.error('Voice chat error:', sanitizeForLog(err));
+    const formatted = formatGeminiError(err, uiLang);
+    return res.status(formatted.status).json({ error: formatted.message });
+  }
+});
+
+async function synthesizeSpeechWithFailover(
+  text: string,
+  voiceName: string,
+  style: string
+): Promise<{ audioBase64: string; mimeType: string }> {
+  const configuredKeys = getConfiguredApiKeys();
+  if (configuredKeys.length === 0) {
+    throw new Error('Speech synthesis service is not configured.');
+  }
+
+  const ttsModels = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts'];
+  let lastError: any = null;
+
+  for (let mIdx = 0; mIdx < ttsModels.length; mIdx++) {
+    const model = ttsModels[mIdx];
+    const hasNextModel = mIdx < ttsModels.length - 1;
+    const { healthy, all } = getOrderedApiKeys(model);
+    if (hasNextModel && healthy.length === 0) continue;
+    const passKeys = hasNextModel ? healthy : all;
+
+    for (let i = 0; i < passKeys.length; i++) {
+      const apiKey = passKeys[i];
+      const client = getGeminiTtsClient(apiKey);
+      try {
+        const part: any = style
+          ? { text, speechMetadata: { style } }
+          : { text };
+        const response = await withTimeout(
+          client.models.generateContent({
+            model,
+            contents: [{ role: 'user', parts: [part] }],
+            config: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName },
+                },
+              },
+            },
+          }),
+          hasNextModel ? 10_000 : 14_000,
+          `TTS (${model})`
+        );
+
+        const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+        const base64Audio = typeof inlineData?.data === 'string' ? inlineData.data : '';
+        if (!base64Audio) {
+          throw new Error('Empty audio payload from TTS model.');
+        }
+
+        markKeySuccess(apiKey, model);
+        return {
+          audioBase64: base64Audio,
+          mimeType:
+            typeof inlineData?.mimeType === 'string' && inlineData.mimeType
+              ? inlineData.mimeType
+              : 'audio/wav',
+        };
+      } catch (err: any) {
+        lastError = err;
+        const status = Number(err?.status || err?.code) || 500;
+        markKeyFailure(apiKey, model, err);
+        if (hasNextModel && (status === 404 || status === 400 || status === 504)) {
+          break;
+        }
+      }
+    }
+  }
+
+  throw lastError || new Error('Ses oluşturulamadı.');
+}
+
+app.post('/api/tts', ttsRateLimit, async (req: Request, res: Response) => {
+  const uiLang = resolveUiLang(req.body);
+  try {
+    const rawText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!rawText || rawText.length > 1200) {
+      return res.status(400).json({
+        error:
+          uiLang === 'en'
+            ? 'Invalid text for speech synthesis.'
+            : 'Seslendirme için geçersiz metin.',
+      });
+    }
+
+    const requestedVoice =
+      typeof req.body?.voiceName === 'string' && ALLOWED_TTS_VOICES.has(req.body.voiceName)
+        ? req.body.voiceName
+        : 'Kore';
+
+    const style =
+      typeof req.body?.style === 'string'
+        ? req.body.style.replace(/[\r\n]+/g, ' ').trim().slice(0, 120)
+        : '';
+
+    if (getConfiguredApiKeys().length === 0) {
+      return res.status(503).json({
+        error:
+          uiLang === 'en'
+            ? 'Speech synthesis is currently unavailable.'
+            : 'Seslendirme servisi şu anda kullanılamıyor.',
+      });
+    }
+
+    const result = await synthesizeSpeechWithFailover(rawText, requestedVoice, style);
+    return res.json(result);
+  } catch (err: any) {
+    console.error('TTS synthesis error:', sanitizeForLog(err));
     const formatted = formatGeminiError(err, uiLang);
     return res.status(formatted.status).json({ error: formatted.message });
   }
@@ -1732,7 +2049,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (err instanceof SyntaxError && 'body' in err) {
     return res.status(400).json({ error: 'Malformed JSON request body.' });
   }
-  console.error('Unhandled server error:', err?.message || err);
+  console.error('Unhandled server error:', sanitizeForLog(err));
   if (res.headersSent) return next(err);
   if (req.path.startsWith('/api')) {
     return res.status(500).json({ error: 'An unexpected server error occurred.' });
@@ -1750,7 +2067,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    app.use(express.static(path.resolve(__dirname, 'dist'), { dotfiles: 'deny' }));
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
@@ -1771,6 +2088,6 @@ async function startServer() {
   process.on('SIGINT', gracefulShutdown);
 }
 
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
+startServer().catch((err) => {
+  console.error('Failed to start server:', sanitizeForLog(err));
 });

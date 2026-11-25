@@ -428,7 +428,7 @@ export function SettingsModal({
                     <form onSubmit={handleSaveProfile} className="space-y-4">
                       <div className="flex items-center gap-3.5">
                         <div className="w-12 h-12 rounded-2xl bg-[var(--ac)] text-[var(--on)] flex items-center justify-center font-display font-bold text-base shrink-0 overflow-hidden ring-1 ring-[var(--bd)]">
-                          {profilePhotoUrl.trim() && !avatarPreviewError ? (
+                          {/^https?:\/\/.+/i.test(profilePhotoUrl.trim()) && !avatarPreviewError ? (
                             <img
                               src={profilePhotoUrl.trim()}
                               alt=""

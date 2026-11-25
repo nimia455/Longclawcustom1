@@ -615,8 +615,68 @@ function buildMarkdownPreview(code: string, runId: string, theme: 'light' | 'dar
 <body>
   <div id="md"></div>
   <script>
-    var raw = ${safeJsonEmbed(code)};
-    document.getElementById('md').innerHTML = window.marked ? window.marked.parse(raw) : raw;
+    (function () {
+      var raw = ${safeJsonEmbed(code)};
+      var target = document.getElementById('md');
+      if (!target) return;
+      if (!window.marked) {
+        target.textContent = raw;
+        return;
+      }
+      var parsed = window.marked.parse(raw);
+      var template = document.createElement('template');
+      template.innerHTML = parsed;
+      var blockedTags = {
+        SCRIPT: true,
+        IFRAME: true,
+        OBJECT: true,
+        EMBED: true,
+        SVG: true,
+        STYLE: true,
+        FORM: true,
+        BASE: true,
+        META: true,
+        LINK: true,
+      };
+      var urlAttrs = { href: true, src: true, action: true, formaction: true };
+      var walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
+      var toRemove = [];
+      var node;
+      while ((node = walker.nextNode())) {
+        if (blockedTags[node.tagName]) {
+          toRemove.push(node);
+          continue;
+        }
+        var attrs = Array.prototype.slice.call(node.attributes || []);
+        for (var i = 0; i < attrs.length; i++) {
+          var attrName = attrs[i].name.toLowerCase();
+          var attrVal = (attrs[i].value || '').trim();
+          if (attrName.indexOf('on') === 0 || attrName === 'srcdoc') {
+            node.removeAttribute(attrs[i].name);
+            continue;
+          }
+          if (urlAttrs[attrName]) {
+            var normalized = attrVal.replace(/[\\u0000-\\u0020]+/g, '').toLowerCase();
+            if (
+              normalized &&
+              normalized.indexOf('http://') !== 0 &&
+              normalized.indexOf('https://') !== 0 &&
+              normalized.indexOf('mailto:') !== 0 &&
+              normalized.indexOf('#') !== 0
+            ) {
+              node.removeAttribute(attrs[i].name);
+            }
+          }
+        }
+      }
+      for (var r = 0; r < toRemove.length; r++) {
+        if (toRemove[r].parentNode) {
+          toRemove[r].parentNode.removeChild(toRemove[r]);
+        }
+      }
+      target.textContent = '';
+      target.appendChild(template.content);
+    })();
   </script>
 </body>
 </html>`;

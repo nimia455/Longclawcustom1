@@ -324,6 +324,26 @@ export interface Translations {
       transcribeFailed: string;
       maxDurationReached: string;
     };
+    voiceChat: {
+      openTitle: string;
+      title: string;
+      tapToSpeak: string;
+      listening: string;
+      transcribing: string;
+      thinking: string;
+      speaking: string;
+      tapToStop: string;
+      interrupt: string;
+      handsFree: string;
+      mute: string;
+      unmute: string;
+      eyeAuto: string;
+      eyeRound: string;
+      eyeOval: string;
+      eyeSquare: string;
+      voiceLabel: string;
+      quickCommands: string[];
+    };
     codePreview: {
       openResult: string;
       copyCode: string;
@@ -1000,6 +1020,31 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         transcribeFailed: 'Ses yazıya çevrilemedi. Lütfen tekrar dene.',
         maxDurationReached: 'Maksimum kayıt süresine ulaşıldı, ses yazıya çevriliyor…',
       },
+      voiceChat: {
+        openTitle: 'Sesli Sohbet (Animasyonlu Gözler)',
+        title: 'Sesli Sohbet',
+        tapToSpeak: 'Konuşmak için dokun',
+        listening: 'Seni dinliyorum…',
+        transcribing: 'Sesin çözülüyor…',
+        thinking: 'Düşünüyor…',
+        speaking: 'Konuşuyor…',
+        tapToStop: 'Göndermek için dokun',
+        interrupt: 'Sözünü kes',
+        handsFree: 'Otomatik dinle',
+        mute: 'Sesi kapat',
+        unmute: 'Sesi aç',
+        eyeAuto: 'Otomatik',
+        eyeRound: 'Yuvarlak',
+        eyeOval: 'Oval',
+        eyeSquare: 'Kare',
+        voiceLabel: 'Ses',
+        quickCommands: [
+          'Kare göz yap ve özyinelemeyi anlat',
+          'Bana kısa bir şaka yap',
+          'Oval göz yap ve rahatlamama yardım et',
+          'Eğlenceli bir dans yap!',
+        ],
+      },
       codePreview: {
         openResult: 'Sonucu aç',
         copyCode: 'Kodu kopyala',
@@ -1669,6 +1714,31 @@ export const TRANSLATIONS: Record<Language, Translations> = {
         emptyTranscript: 'No speech detected. Please try again.',
         transcribeFailed: 'Could not transcribe audio. Please try again.',
         maxDurationReached: 'Maximum recording length reached, transcribing…',
+      },
+      voiceChat: {
+        openTitle: 'Voice Chat (Animated Eyes)',
+        title: 'Voice Chat',
+        tapToSpeak: 'Tap to speak',
+        listening: 'Listening to you…',
+        transcribing: 'Understanding your voice…',
+        thinking: 'Thinking…',
+        speaking: 'Speaking…',
+        tapToStop: 'Tap to send',
+        interrupt: 'Interrupt',
+        handsFree: 'Hands-free',
+        mute: 'Mute voice',
+        unmute: 'Unmute voice',
+        eyeAuto: 'Auto',
+        eyeRound: 'Round',
+        eyeOval: 'Oval',
+        eyeSquare: 'Square',
+        voiceLabel: 'Voice',
+        quickCommands: [
+          'Make square eyes & explain recursion',
+          'Tell me a quick joke',
+          'Switch to oval eyes & help me relax',
+          'Do a playful dance!',
+        ],
       },
       codePreview: {
         openResult: 'Open result',
