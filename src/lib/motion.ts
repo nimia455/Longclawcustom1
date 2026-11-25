@@ -5,6 +5,7 @@
  */
 
 export const LIQUID_EASE = [0.22, 1, 0.36, 1] as const;
+export const EDITORIAL_EASE = [0.16, 1, 0.3, 1] as const;
 export const EXIT_EASE = [0.4, 0, 1, 1] as const;
 
 export const MODAL_BACKDROP_ENTER = {
@@ -64,7 +65,18 @@ export const LIQUID_SCROLL_SPRING = {
   mass: 0.6,
 };
 
+export const PROGRESS_SCROLL_SPRING = {
+  stiffness: 180,
+  damping: 34,
+  mass: 0.35,
+};
+
 export const LIQUID_VIEWPORT = {
   once: true,
   amount: 0.16,
+} as const;
+
+export const EDITORIAL_VIEWPORT = {
+  once: true,
+  amount: 0.2,
 } as const;

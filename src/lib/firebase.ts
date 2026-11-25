@@ -18,6 +18,8 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
+  Firestore,
   doc,
   getDoc,
   getDocs,
@@ -38,7 +40,23 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 const firestoreDatabaseId = (firebaseConfig as { firestoreDatabaseId?: string })
   .firestoreDatabaseId;
-export const db = firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
+
+function createFirestoreInstance(): Firestore {
+  try {
+    return initializeFirestore(
+      app,
+      {
+        experimentalAutoDetectLongPolling: true,
+      },
+      firestoreDatabaseId
+    );
+  } catch {
+    // Already initialized (e.g., module hot reload) — reuse existing instance
+    return firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
+  }
+}
+
+export const db = createFirestoreInstance();
 export const auth = getAuth(app);
 
 // Authentication Providers
@@ -98,17 +116,37 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// CRITICAL CONSTRAINT: Test connection on boot
+function isTransientOfflineError(error: unknown): boolean {
+  const code = String((error as any)?.code || '').toLowerCase();
+  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    code === 'unavailable' ||
+    msg.includes('client is offline') ||
+    msg.includes('network-request-failed') ||
+    msg.includes('could not reach cloud firestore backend')
+  );
+}
+
+// Connection health check on boot (tolerates brief initial transport negotiation / offline browsers)
 export async function testConnection() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return;
+  }
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
+    if (isTransientOfflineError(error)) {
+      // Retry once after long-polling negotiation settles
+      await new Promise((r) => setTimeout(r, 1800));
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch {
+        console.warn('Firestore connection check skipped while offline or negotiating transport.');
+      }
     }
   }
 }
-testConnection();
+void testConnection();
 
 // Types for Chat & Messages
 export interface GeneratedImageData {
@@ -410,34 +448,38 @@ export async function syncUserProfile(user: User) {
   const path = `users/${user.uid}`;
   try {
     const userRef = doc(db, 'users', user.uid);
-    const existingSnap = await getDoc(userRef);
-
     const displayName = (
       user.displayName ||
       user.email?.split('@')[0] ||
       'Kullanıcı'
     ).slice(0, 100);
 
-    if (!existingSnap.exists()) {
-      await setDoc(userRef, {
-        id: user.uid,
-        email: (user.email || '').slice(0, 256),
-        displayName,
-        photoURL: (user.photoURL || '').slice(0, 1000),
-        emailVerified: !!user.emailVerified,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      await updateDoc(userRef, {
-        email: (user.email || '').slice(0, 256),
-        displayName,
-        photoURL: (user.photoURL || '').slice(0, 1000),
-        emailVerified: !!user.emailVerified,
-        updatedAt: serverTimestamp(),
-      });
+    const mutableFields = {
+      email: (user.email || '').slice(0, 256),
+      displayName,
+      photoURL: (user.photoURL || '').slice(0, 1000),
+      emailVerified: !!user.emailVerified,
+      updatedAt: serverTimestamp(),
+    };
+
+    try {
+      await updateDoc(userRef, mutableFields);
+    } catch (updateErr: any) {
+      if (updateErr?.code === 'not-found') {
+        await setDoc(userRef, {
+          id: user.uid,
+          ...mutableFields,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        throw updateErr;
+      }
     }
   } catch (error) {
+    if (isTransientOfflineError(error)) {
+      console.warn('Skipped user profile sync while Firestore is offline.');
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }

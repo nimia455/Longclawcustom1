@@ -32,6 +32,8 @@ import {
   Settings,
   Terminal,
   User as UserIcon,
+  Mic,
+  Loader2,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { LIQUID_MORPH, LIQUID_SPRING, LIQUID_TAP } from '../lib/motion';
@@ -75,7 +77,12 @@ import {
   getAllSlashCommands,
   parseSlashCommandInput,
 } from '../lib/commands';
-import { apiUrl, getStaticHostNotice, isStaticHostWithoutBackend } from '../lib/api';
+import {
+  apiUrl,
+  getStaticHostNotice,
+  isStaticHostErrorResponse,
+  isStaticHostWithoutBackend,
+} from '../lib/api';
 import {
   buildGmailSearchQueryFromPrompt,
   createGmailDraft,
@@ -115,6 +122,7 @@ import {
 } from '../lib/codeRunner';
 import { renderMarkdown } from '../lib/markdown';
 import { useKeyboardShortcuts, formatModKey } from '../hooks/useKeyboardShortcuts';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 import {
   FAMILY_MODELS,
   OTHER_MODELS,
@@ -131,6 +139,7 @@ interface ChatWorkspaceProps {
   currentChatId: string | null;
   onSelectChat: (id: string) => void;
   onNewChat: () => void;
+  onCreateChat: (initialDepth?: 'fast' | 'mid' | 'deep') => ChatSession;
   onDeleteChat: (id: string) => void;
   onTogglePinChat: (id: string) => void;
   onRenameChat: (id: string, newTitle: string) => void;
@@ -159,6 +168,7 @@ export function ChatWorkspace({
   currentChatId,
   onSelectChat,
   onNewChat,
+  onCreateChat,
   onDeleteChat,
   onTogglePinChat,
   onRenameChat,
@@ -182,7 +192,7 @@ export function ChatWorkspace({
 }: ChatWorkspaceProps) {
   const t = TRANSLATIONS[lang];
   const cText = t.chat;
-  const currentChat = chats.find((c) => c.id === currentChatId) || chats[0] || null;
+  const currentChat = currentChatId ? chats.find((c) => c.id === currentChatId) || null : null;
   const modKey = formatModKey();
 
   const isDefaultChatTitle = (title?: string | null) =>
@@ -277,6 +287,55 @@ export function ChatWorkspace({
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingThoughts, setStreamingThoughts] = useState('');
   const [streamingText, setStreamingText] = useState('');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const voiceErrorTimerRef = useRef<number | null>(null);
+
+  const showVoiceError = (msg: string) => {
+    setVoiceError(msg);
+    if (voiceErrorTimerRef.current !== null) {
+      window.clearTimeout(voiceErrorTimerRef.current);
+    }
+    voiceErrorTimerRef.current = window.setTimeout(() => {
+      setVoiceError((curr) => (curr === msg ? null : curr));
+      voiceErrorTimerRef.current = null;
+    }, 6000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (voiceErrorTimerRef.current !== null) {
+        window.clearTimeout(voiceErrorTimerRef.current);
+      }
+    };
+  }, []);
+
+  const voice = useVoiceInput({
+    lang,
+    onTranscript: (spokenText) => {
+      setVoiceError(null);
+      setSlashMenuDismissed(false);
+      setInputMessage((prev) => {
+        const trimmedPrev = prev.trimEnd();
+        return trimmedPrev ? `${trimmedPrev} ${spokenText}` : spokenText;
+      });
+      window.requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      });
+    },
+    onError: showVoiceError,
+  });
+
+  const formatVoiceDuration = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   // Derived slash command autocomplete list
   const slashQuery =
@@ -314,6 +373,7 @@ export function ChatWorkspace({
   };
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const streamingChatRef = useRef<{ id: string; messages: ChatMessage[] } | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef<boolean>(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -364,6 +424,10 @@ export function ChatWorkspace({
     setPreviewExpanded(false);
     isNearBottomRef.current = true;
     setShowScrollToBottom(false);
+    if (voice.isRecording || voice.isTranscribing) {
+      voice.cancelRecording();
+    }
+    setVoiceError(null);
   }, [currentChat?.id]);
 
   // Reset slash menu highlight when query changes
@@ -567,10 +631,14 @@ export function ChatWorkspace({
             connectorsOpen ||
             pendingChatGmailAction ||
             pendingWorkspaceMutation ||
-            lightboxImageSrc
+            lightboxImageSrc ||
+            voice.isRecording ||
+            voice.isTranscribing
         ),
       handler: () => {
-        if (slashMenuOpen) {
+        if (voice.isRecording || voice.isTranscribing) {
+          voice.cancelRecording();
+        } else if (slashMenuOpen) {
           setSlashMenuDismissed(true);
         } else if (lightboxImageSrc) {
           setLightboxImageSrc(null);
@@ -784,9 +852,14 @@ export function ChatWorkspace({
     setGeneratingImage(false);
     setCheckingWorkspaceLabel(null);
 
-    if (currentChat && streamingText) {
+    const activeStreamTarget = streamingChatRef.current;
+    streamingChatRef.current = null;
+
+    if (streamingText && (activeStreamTarget || currentChat)) {
+      const targetId = activeStreamTarget?.id || currentChat!.id;
+      const baseMessages = activeStreamTarget?.messages || currentChat?.messages || [];
       const updatedMessages = [
-        ...(currentChat.messages || []),
+        ...baseMessages,
         {
           id: `msg-${Date.now()}`,
           role: 'assistant' as const,
@@ -797,7 +870,7 @@ export function ChatWorkspace({
           createdAt: Date.now(),
         },
       ];
-      onUpdateChatMessages(currentChat.id, updatedMessages);
+      void onUpdateChatMessages(targetId, updatedMessages);
     }
     setStreamingText('');
     setStreamingThoughts('');
@@ -807,12 +880,12 @@ export function ChatWorkspace({
     textToSend?: string,
     overrideImages?: AttachedImage[]
   ) => {
-    if (isStreaming) return;
+    if (isStreaming || voice.isRecording || voice.isTranscribing) return;
     const rawText = (textToSend !== undefined ? textToSend : inputMessage).trim();
     const imagesToSend =
       overrideImages !== undefined ? overrideImages : textToSend !== undefined ? [] : attachedImages;
 
-    if ((!rawText && imagesToSend.length === 0) || !currentChat) return;
+    if (!rawText && imagesToSend.length === 0) return;
 
     // Intercept slash commands (/command ...)
     const parsedCmd = rawText ? parseSlashCommandInput(rawText, customCommands, lang) : null;
@@ -932,6 +1005,8 @@ export function ChatWorkspace({
       textareaRef.current.style.height = 'auto';
     }
 
+    const targetChat = currentChat || onCreateChat(effectiveDepth);
+
     const newUserMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
@@ -940,11 +1015,12 @@ export function ChatWorkspace({
       createdAt: Date.now(),
     };
 
-    const currentList = currentChat.messages || [];
+    const currentList = targetChat.messages || [];
     const updatedWithUser = [...currentList, newUserMsg];
+    streamingChatRef.current = { id: targetChat.id, messages: updatedWithUser };
 
     // Optimistically update without blocking the network request
-    void onUpdateChatMessages(currentChat.id, updatedWithUser);
+    void onUpdateChatMessages(targetChat.id, updatedWithUser);
 
     // Prepare API call
     setIsStreaming(true);
@@ -1005,19 +1081,19 @@ export function ChatWorkspace({
           };
 
           const finalMessages = [...updatedWithUser, newAssistantMsg];
-          void onUpdateChatMessages(currentChat.id, finalMessages);
+          void onUpdateChatMessages(targetChat.id, finalMessages);
 
-          if (isDefaultChatTitle(currentChat.title) && updatedWithUser.length === 1) {
+          if (isDefaultChatTitle(targetChat.title) && updatedWithUser.length === 1) {
             const fallbackTitle =
               outcome.titleHint ||
               `${connectorNames[connectorCommand.connectorId]} · ${displayText.slice(0, 24)}`;
-            void onUpdateChatMessages(currentChat.id, finalMessages, fallbackTitle);
+            void onUpdateChatMessages(targetChat.id, finalMessages, fallbackTitle);
           }
 
           if (outcome.status === 'confirm') {
             setPendingWorkspaceMutation({
               mutation: outcome.pending,
-              chatId: currentChat.id,
+              chatId: targetChat.id,
               assistantMsgId,
             });
           }
@@ -1043,7 +1119,7 @@ export function ChatWorkspace({
               modelId: selectedModel,
               createdAt: Date.now(),
             };
-            void onUpdateChatMessages(currentChat.id, [...updatedWithUser, reauthMsg]);
+            void onUpdateChatMessages(targetChat.id, [...updatedWithUser, reauthMsg]);
             openConnectors(connectorCommand.connectorId);
             return;
           }
@@ -1068,7 +1144,7 @@ export function ChatWorkspace({
           }),
         });
 
-        if (imgRes.status === 404 && !import.meta.env.VITE_API_BASE_URL) {
+        if (isStaticHostErrorResponse(imgRes)) {
           throw new Error(getStaticHostNotice(lang));
         }
 
@@ -1120,11 +1196,11 @@ export function ChatWorkspace({
         };
 
         const finalMessages = [...updatedWithUser, newAssistantMsg];
-        void onUpdateChatMessages(currentChat.id, finalMessages);
+        void onUpdateChatMessages(targetChat.id, finalMessages);
         setImageMode(false);
 
-        if (isDefaultChatTitle(currentChat.title) && updatedWithUser.length === 1) {
-          const chatIdToTitle = currentChat.id;
+        if (isDefaultChatTitle(targetChat.title) && updatedWithUser.length === 1) {
+          const chatIdToTitle = targetChat.id;
           const fallbackTitle = String(imgData.title || effectiveImagePrompt).slice(0, 36);
           void onUpdateChatMessages(chatIdToTitle, finalMessages, fallbackTitle);
         }
@@ -1332,7 +1408,7 @@ export function ChatWorkspace({
       });
 
       if (!response.ok) {
-        if (response.status === 404 && !import.meta.env.VITE_API_BASE_URL) {
+        if (isStaticHostErrorResponse(response)) {
           throw new Error(getStaticHostNotice(lang));
         }
         const errJson = await response.json().catch(() => ({}));
@@ -1401,11 +1477,11 @@ export function ChatWorkspace({
       };
 
       const finalMessages = [...updatedWithUser, newAssistantMsg];
-      void onUpdateChatMessages(currentChat.id, finalMessages);
+      void onUpdateChatMessages(targetChat.id, finalMessages);
 
       // Auto-title in the background so the chat completes immediately without waiting for a second API round-trip
-      if (isDefaultChatTitle(currentChat.title) && updatedWithUser.length === 1) {
-        const chatIdToTitle = currentChat.id;
+      if (isDefaultChatTitle(targetChat.title) && updatedWithUser.length === 1) {
+        const chatIdToTitle = targetChat.id;
         void (async () => {
           let newTitle = displayText.slice(0, 30);
           try {
@@ -1439,7 +1515,7 @@ export function ChatWorkspace({
         content: cText.chatErrorMessage(err.message || cText.connectionError),
         createdAt: Date.now(),
       };
-      await onUpdateChatMessages(currentChat.id, [...updatedWithUser, errorMsg]);
+      await onUpdateChatMessages(targetChat.id, [...updatedWithUser, errorMsg]);
     } finally {
       setIsStreaming(false);
       setGeneratingImage(false);
@@ -1447,6 +1523,7 @@ export function ChatWorkspace({
       setStreamingText('');
       setStreamingThoughts('');
       abortControllerRef.current = null;
+      streamingChatRef.current = null;
     }
   };
 
@@ -2727,6 +2804,102 @@ export function ChatWorkspace({
                 </div>
               )}
 
+              <AnimatePresence initial={false}>
+                {(voice.isRecording || voice.isTranscribing) && (
+                  <motion.div
+                    key="voice-bar"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex items-center justify-between gap-3 pb-2.5 mb-2 border-b border-[var(--bd)]/65 text-xs"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      {voice.isRecording ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                          <div
+                            className="flex items-center gap-[3px] h-4 shrink-0"
+                            aria-hidden="true"
+                          >
+                            {voice.audioLevels.map((lvl, idx) => (
+                              <span
+                                key={idx}
+                                className="w-[2.5px] rounded-full bg-[var(--tx)] transition-[height] duration-75"
+                                style={{ height: `${Math.round(4 + lvl * 13)}px` }}
+                              />
+                            ))}
+                          </div>
+                          <span className="font-medium text-[var(--tx)] truncate">
+                            {voice.interimTranscript || cText.voice.listeningLabel}
+                          </span>
+                          <span className="font-mono text-[11px] text-[var(--mut)] tabular-nums shrink-0">
+                            {formatVoiceDuration(voice.elapsedSeconds)}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--tx)] shrink-0" />
+                          <span className="font-medium text-[var(--tx)] truncate">
+                            {cText.voice.transcribingLabel}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={voice.cancelRecording}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)] transition-colors cursor-pointer"
+                        title={cText.voice.cancelTitle}
+                        aria-label={cText.voice.cancelTitle}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      {voice.isRecording && (
+                        <button
+                          type="button"
+                          onClick={voice.stopRecording}
+                          className="w-7 h-7 rounded-full bg-[var(--ac)] text-[var(--on)] hover:opacity-90 flex items-center justify-center transition-opacity cursor-pointer"
+                          title={cText.voice.stopTitle}
+                          aria-label={cText.voice.stopTitle}
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[2.3]" />
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {voiceError && !voice.isRecording && !voice.isTranscribing && (
+                  <motion.div
+                    key="voice-error"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[var(--bd)]/65 text-xs text-red-600 dark:text-red-400"
+                    role="alert"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{voiceError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceError(null)}
+                      aria-label={t.common.close}
+                      className="p-0.5 rounded-full hover:bg-[var(--surf)] text-current shrink-0 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <textarea
                 ref={textareaRef}
                 rows={1}
@@ -2974,26 +3147,71 @@ export function ChatWorkspace({
                   </div>
                 </div>
 
-                {isStreaming ? (
-                  <button
-                    type="button"
-                    onClick={handleStopStreaming}
-                    className="w-9 h-9 rounded-full bg-[var(--tx)] text-[var(--bg)] hover:opacity-85 flex items-center justify-center shrink-0 transition-opacity cursor-pointer"
-                    title={cText.stopTitle}
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage()}
-                    disabled={!inputMessage.trim() && attachedImages.length === 0}
-                    className="btn-3d-primary w-9 h-9 rounded-full flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
-                    title={cText.sendTitle}
-                  >
-                    <ArrowUp className="w-4 h-4 stroke-[2.2]" />
-                  </button>
-                )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {voice.isSupported && !isStreaming && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVoiceError(null);
+                        voice.toggleRecording();
+                      }}
+                      disabled={voice.isTranscribing}
+                      aria-pressed={voice.isRecording}
+                      aria-label={
+                        voice.isRecording
+                          ? cText.voice.stopTitle
+                          : voice.isTranscribing
+                            ? cText.voice.transcribingLabel
+                            : cText.voice.startTitle
+                      }
+                      title={
+                        voice.isRecording
+                          ? cText.voice.stopTitle
+                          : voice.isTranscribing
+                            ? cText.voice.transcribingLabel
+                            : cText.voice.startTitle
+                      }
+                      className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
+                        voice.isRecording
+                          ? 'bg-red-500/15 text-red-600 dark:text-red-400 ring-1 ring-red-500/40 hover:bg-red-500/25'
+                          : 'text-[var(--mut)] hover:text-[var(--tx)] hover:bg-[var(--surf)]'
+                      }`}
+                    >
+                      {voice.isTranscribing ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : voice.isRecording ? (
+                        <Square className="w-3 h-3 fill-current" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+
+                  {isStreaming ? (
+                    <button
+                      type="button"
+                      onClick={handleStopStreaming}
+                      className="w-9 h-9 rounded-full bg-[var(--tx)] text-[var(--bg)] hover:opacity-85 flex items-center justify-center shrink-0 transition-opacity cursor-pointer"
+                      title={cText.stopTitle}
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSendMessage()}
+                      disabled={
+                        voice.isRecording ||
+                        voice.isTranscribing ||
+                        (!inputMessage.trim() && attachedImages.length === 0)
+                      }
+                      className="btn-3d-primary w-9 h-9 rounded-full flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+                      title={cText.sendTitle}
+                    >
+                      <ArrowUp className="w-4 h-4 stroke-[2.2]" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

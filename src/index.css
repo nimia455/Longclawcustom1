@@ -419,6 +419,26 @@ body {
   box-shadow: 0 22px 46px -26px rgba(0, 0, 0, 0.58);
 }
 
+/* Pointer-tracked subtle architectural card light (60fps CSS vars, zero blur) */
+.spotlight-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.28s var(--ease-calm);
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 50%),
+    var(--ac-soft),
+    transparent 70%
+  );
+  z-index: 1;
+}
+
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
 .smooth-photo {
   transition: transform 0.7s var(--ease-calm);
   will-change: transform;

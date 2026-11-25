@@ -38,6 +38,8 @@ export default function App() {
   const [chats, setChats] = useState<ChatSession[]>([]);
   const chatsRef = useRef<ChatSession[]>([]);
   chatsRef.current = chats;
+  const pendingLocalChatsRef = useRef<Map<string, ChatSession>>(new Map());
+  const unpersistedChatIdsRef = useRef<Set<string>>(new Set());
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
 
   // Modals state
@@ -243,15 +245,18 @@ export default function App() {
   // Real-time Firestore sync when user is authenticated
   useEffect(() => {
     if (!user) {
-      // Guest mode: load from localStorage if exists
+      pendingLocalChatsRef.current.clear();
+      unpersistedChatIdsRef.current.clear();
+      // Guest mode: load from localStorage if exists (keep composer ready on fresh welcome screen)
       try {
         const local = localStorage.getItem('lc_guest_chats');
         if (local) {
           const parsed: ChatSession[] = JSON.parse(local);
-          setChats(parsed);
-          if (parsed.length > 0) {
+          if (Array.isArray(parsed)) {
+            chatsRef.current = parsed;
+            setChats(parsed);
             setCurrentChatId((prev) =>
-              prev && parsed.some((c) => c.id === prev) ? prev : parsed[0].id
+              prev && parsed.some((c) => c.id === prev) ? prev : null
             );
           }
         }
@@ -270,38 +275,45 @@ export default function App() {
           if (local) {
             try {
               const parsed: ChatSession[] = JSON.parse(local);
-              if (parsed.length > 0) {
-                // Migrate guest chats
+              if (Array.isArray(parsed) && parsed.length > 0) {
                 parsed.forEach((c) => {
-                  saveChatSession(user.uid, { ...c, userId: user.uid }, true);
+                  void saveChatSession(user.uid, { ...c, userId: user.uid }, true).catch(() => {});
                 });
                 localStorage.removeItem('lc_guest_chats');
                 return;
               }
             } catch {}
           }
-
-          // Create initial starter chat
-          const initialChat: ChatSession = {
-            id: `chat-${Date.now()}`,
-            userId: user.uid,
-            title: TRANSLATIONS[getInitialLanguage()].common.newChat,
-            mode: 'chat',
-            depth: 'mid',
-            pin: false,
-            messages: [],
-          };
-          saveChatSession(user.uid, initialChat, true);
-          setChats([initialChat]);
-          setCurrentChatId(initialChat.id);
-          setChatsReadyForUid(user.uid);
-        } else {
-          setChats(fetchedChats);
-          setCurrentChatId((prev) =>
-            prev && fetchedChats.some((c) => c.id === prev) ? prev : fetchedChats[0].id
-          );
-          setChatsReadyForUid(user.uid);
         }
+
+        // Preserve any locally created/updated chats that haven't echoed back from Firestore yet
+        const fetchedById = new Map(fetchedChats.map((c) => [c.id, c]));
+        const merged: ChatSession[] = [];
+
+        for (const [pendingId, pendingChat] of pendingLocalChatsRef.current.entries()) {
+          const remote = fetchedById.get(pendingId);
+          if (!remote) {
+            merged.push(pendingChat);
+          } else if ((remote.messages?.length || 0) < (pendingChat.messages?.length || 0)) {
+            merged.push({ ...remote, ...pendingChat });
+            fetchedById.delete(pendingId);
+          } else {
+            pendingLocalChatsRef.current.delete(pendingId);
+          }
+        }
+
+        for (const remoteChat of fetchedChats) {
+          if (fetchedById.has(remoteChat.id)) {
+            merged.push(remoteChat);
+          }
+        }
+
+        chatsRef.current = merged;
+        setChats(merged);
+        setCurrentChatId((prev) =>
+          prev && merged.some((c) => c.id === prev) ? prev : null
+        );
+        setChatsReadyForUid(user.uid);
       },
       (error) => {
         console.warn('Firestore subscription notice:', error);
@@ -313,48 +325,63 @@ export default function App() {
   }, [user?.uid]);
 
   // Operations
-  const handleNewChat = async () => {
+  // Create a chat synchronously so users can send their very first message without opening a chat first
+  const handleCreateChat = (initialDepth: 'fast' | 'mid' | 'deep' = 'mid'): ChatSession => {
     const newChat: ChatSession = {
-      id: `chat-${Date.now()}`,
+      id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       userId: user?.uid || 'guest',
       title: t.common.newChat,
       mode: 'chat',
-      depth: 'mid',
+      depth: initialDepth,
       pin: false,
       messages: [],
     };
 
+    const updated = [newChat, ...chatsRef.current];
+    chatsRef.current = updated;
+    setChats(updated);
+    setCurrentChatId(newChat.id);
+    setMobileMenuOpen(false);
+
     if (user) {
-      await saveChatSession(user.uid, newChat, true);
+      pendingLocalChatsRef.current.set(newChat.id, newChat);
+      unpersistedChatIdsRef.current.add(newChat.id);
     } else {
-      const updated = [newChat, ...chatsRef.current];
-      setChats(updated);
       try {
         localStorage.setItem('lc_guest_chats', JSON.stringify(updated));
       } catch {}
     }
-    setCurrentChatId(newChat.id);
+
+    return newChat;
+  };
+
+  // Start a fresh blank composer without cluttering the sidebar with empty chats until a message is sent
+  const handleNewChat = () => {
+    setCurrentChatId(null);
     setMobileMenuOpen(false);
     setComposerFocusTick((tick) => tick + 1);
   };
 
   const handleDeleteChat = async (id: string) => {
+    pendingLocalChatsRef.current.delete(id);
     const remaining = chatsRef.current.filter((c) => c.id !== id);
+    chatsRef.current = remaining;
+    setChats(remaining);
+
+    if (currentChatId === id) {
+      setCurrentChatId(null);
+    }
+
     if (user) {
-      await deleteChatSession(user.uid, id);
+      try {
+        await deleteChatSession(user.uid, id);
+      } catch (err) {
+        console.warn('Could not delete chat from Firestore:', err);
+      }
     } else {
-      setChats(remaining);
       try {
         localStorage.setItem('lc_guest_chats', JSON.stringify(remaining));
       } catch {}
-    }
-
-    if (currentChatId === id) {
-      if (remaining.length > 0) {
-        setCurrentChatId(remaining[0].id);
-      } else {
-        void handleNewChat();
-      }
     }
   };
 
@@ -363,11 +390,18 @@ export default function App() {
     if (!target) return;
     const updatedChat: ChatSession = { ...target, pin: !target.pin };
 
+    const updated = chatsRef.current.map((c) => (c.id === id ? updatedChat : c));
+    chatsRef.current = updated;
+    setChats(updated);
+
     if (user) {
-      await saveChatSession(user.uid, updatedChat, false);
+      pendingLocalChatsRef.current.set(id, updatedChat);
+      try {
+        await saveChatSession(user.uid, updatedChat, false);
+      } catch (err) {
+        console.warn('Could not update pin state:', err);
+      }
     } else {
-      const updated = chatsRef.current.map((c) => (c.id === id ? updatedChat : c));
-      setChats(updated);
       try {
         localStorage.setItem('lc_guest_chats', JSON.stringify(updated));
       } catch {}
@@ -379,11 +413,18 @@ export default function App() {
     if (!target || !newTitle.trim()) return;
     const updatedChat: ChatSession = { ...target, title: newTitle.trim() };
 
+    const updated = chatsRef.current.map((c) => (c.id === id ? updatedChat : c));
+    chatsRef.current = updated;
+    setChats(updated);
+
     if (user) {
-      await saveChatSession(user.uid, updatedChat, false);
+      pendingLocalChatsRef.current.set(id, updatedChat);
+      try {
+        await saveChatSession(user.uid, updatedChat, false);
+      } catch (err) {
+        console.warn('Could not persist chat rename:', err);
+      }
     } else {
-      const updated = chatsRef.current.map((c) => (c.id === id ? updatedChat : c));
-      setChats(updated);
       try {
         localStorage.setItem('lc_guest_chats', JSON.stringify(updated));
       } catch {}
@@ -396,38 +437,43 @@ export default function App() {
     newTitle?: string
   ) => {
     const existing = chatsRef.current.find((c) => c.id === chatId);
-    if (!existing) return;
+    const isNewRecord = !existing || unpersistedChatIdsRef.current.has(chatId);
+    unpersistedChatIdsRef.current.delete(chatId);
+    const baseChat: ChatSession = existing || {
+      id: chatId,
+      userId: user?.uid || 'guest',
+      title: newTitle || t.common.newChat,
+      mode: 'chat',
+      depth: 'mid',
+      pin: false,
+      messages: [],
+    };
 
     const updatedChat: ChatSession = {
-      ...existing,
+      ...baseChat,
       messages,
       ...(newTitle ? { title: newTitle } : {}),
     };
 
-    setChats((prev) => {
-      const next = prev.map((c) =>
-        c.id === chatId
-          ? {
-              ...c,
-              messages,
-              ...(newTitle ? { title: newTitle } : {}),
-            }
-          : c
-      );
-      if (!user) {
-        try {
-          localStorage.setItem('lc_guest_chats', JSON.stringify(next));
-        } catch {}
-      }
-      return next;
-    });
+    const next = existing
+      ? chatsRef.current.map((c) => (c.id === chatId ? updatedChat : c))
+      : [updatedChat, ...chatsRef.current];
 
-    if (user) {
+    chatsRef.current = next;
+    setChats(next);
+
+    if (!user) {
       try {
-        await saveChatSession(user.uid, updatedChat, false);
-      } catch (err) {
-        console.warn('Could not persist chat update:', err);
-      }
+        localStorage.setItem('lc_guest_chats', JSON.stringify(next));
+      } catch {}
+      return;
+    }
+
+    pendingLocalChatsRef.current.set(chatId, updatedChat);
+    try {
+      await saveChatSession(user.uid, updatedChat, isNewRecord);
+    } catch (err) {
+      console.warn('Could not persist chat update:', err);
     }
   };
 
@@ -585,6 +631,7 @@ export default function App() {
       {!authLoading && view === 'landing' ? (
         <div key="landing-shell" className="animate-fade">
           <LandingPage
+            user={user}
             onOpenAuth={handleOpenAuth}
             onOpenLegal={(type) => setLegalModalType(type)}
             theme={theme}
@@ -601,6 +648,7 @@ export default function App() {
             currentChatId={currentChatId}
             onSelectChat={(id) => setCurrentChatId(id)}
             onNewChat={handleNewChat}
+            onCreateChat={handleCreateChat}
             onDeleteChat={handleDeleteChat}
             onTogglePinChat={handleTogglePinChat}
             onRenameChat={handleRenameChat}

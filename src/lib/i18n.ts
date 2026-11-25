@@ -24,6 +24,7 @@ export interface Translations {
     whatItDoes: string;
     depths: string;
     benchmarks: string;
+    api: string;
     faq: string;
     toggleTheme: string;
     signIn: string;
@@ -310,6 +311,19 @@ export interface Translations {
     connectionError: string;
     fileLabel: string;
     exportUserLabel: string;
+    voice: {
+      startTitle: string;
+      stopTitle: string;
+      cancelTitle: string;
+      listeningLabel: string;
+      transcribingLabel: string;
+      permissionDenied: string;
+      noMicrophone: string;
+      notSupported: string;
+      emptyTranscript: string;
+      transcribeFailed: string;
+      maxDurationReached: string;
+    };
     codePreview: {
       openResult: string;
       copyCode: string;
@@ -428,6 +442,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       whatItDoes: 'Komutlar',
       depths: 'Derinlikler',
       benchmarks: 'Ölçümler',
+      api: 'API',
       faq: 'SSS',
       toggleTheme: 'Temayı değiştir',
       signIn: 'Giriş yap',
@@ -972,6 +987,19 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       connectionError: 'Bağlantı hatası',
       fileLabel: 'Dosya',
       exportUserLabel: 'Sen',
+      voice: {
+        startTitle: 'Sesle yaz (Mikrofon)',
+        stopTitle: 'Kaydı bitir ve metne dök',
+        cancelTitle: 'Ses kaydını iptal et',
+        listeningLabel: 'Dinliyor…',
+        transcribingLabel: 'Ses yazıya çevriliyor…',
+        permissionDenied: 'Mikrofon izni reddedildi. Tarayıcı ayarlarından mikrofona izin verip tekrar dene.',
+        noMicrophone: 'Bağlı bir mikrofon bulunamadı.',
+        notSupported: 'Bu tarayıcıda sesli giriş desteklenmiyor.',
+        emptyTranscript: 'Konuşma algılanamadı. Tekrar dener misin?',
+        transcribeFailed: 'Ses yazıya çevrilemedi. Lütfen tekrar dene.',
+        maxDurationReached: 'Maksimum kayıt süresine ulaşıldı, ses yazıya çevriliyor…',
+      },
       codePreview: {
         openResult: 'Sonucu aç',
         copyCode: 'Kodu kopyala',
@@ -1088,6 +1116,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       whatItDoes: 'Commands',
       depths: 'Depths',
       benchmarks: 'Benchmarks',
+      api: 'API',
       faq: 'FAQ',
       toggleTheme: 'Switch theme',
       signIn: 'Sign in',
@@ -1628,6 +1657,19 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       connectionError: 'Connection error',
       fileLabel: 'File',
       exportUserLabel: 'You',
+      voice: {
+        startTitle: 'Speak prompt (Microphone)',
+        stopTitle: 'Finish recording & transcribe',
+        cancelTitle: 'Cancel voice recording',
+        listeningLabel: 'Listening…',
+        transcribingLabel: 'Transcribing audio…',
+        permissionDenied: 'Microphone permission was denied. Allow microphone access in your browser settings and try again.',
+        noMicrophone: 'No microphone was found on this device.',
+        notSupported: 'Voice input is not supported in this browser.',
+        emptyTranscript: 'No speech detected. Please try again.',
+        transcribeFailed: 'Could not transcribe audio. Please try again.',
+        maxDurationReached: 'Maximum recording length reached, transcribing…',
+      },
       codePreview: {
         openResult: 'Open result',
         copyCode: 'Copy code',

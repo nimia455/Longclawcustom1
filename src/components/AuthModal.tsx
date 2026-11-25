@@ -221,7 +221,14 @@ export function AuthModal({
       onSuccess();
     } catch (err: any) {
       console.error('Google auth error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
+      const host = typeof window !== 'undefined' ? window.location.hostname : '';
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(
+          lang === 'tr'
+            ? `"${host}" alan adı Firebase Yetkili Alan Adları listesinde yok. Firebase Console → Authentication → Settings → Authorized domains bölümüne ekleyin.`
+            : `Domain "${host}" is not authorized in Firebase yet. Add it under Firebase Console → Authentication → Settings → Authorized domains.`
+        );
+      } else if (err.code === 'auth/popup-closed-by-user') {
         setError(errs.popupClosed);
       } else if (err.code === 'auth/account-exists-with-different-credential') {
         setError(errs.accountExistsDifferentCred);
@@ -244,7 +251,14 @@ export function AuthModal({
       onSuccess();
     } catch (err: any) {
       console.error('Apple auth error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
+      const host = typeof window !== 'undefined' ? window.location.hostname : '';
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(
+          lang === 'tr'
+            ? `"${host}" alan adı Firebase Yetkili Alan Adları listesinde yok. Firebase Console → Authentication → Settings → Authorized domains bölümüne ekleyin.`
+            : `Domain "${host}" is not authorized in Firebase yet. Add it under Firebase Console → Authentication → Settings → Authorized domains.`
+        );
+      } else if (err.code === 'auth/popup-closed-by-user') {
         setError(errs.applePopupClosed);
       } else if (err.code === 'auth/operation-not-allowed') {
         setError(errs.appleNotAllowed);

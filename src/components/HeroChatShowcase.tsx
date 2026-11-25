@@ -12,7 +12,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { LongclawLogo } from './Icons';
 import { Language } from '../lib/i18n';
-import { LIQUID_EASE, LIQUID_MORPH, LIQUID_TAP } from '../lib/motion';
+import { EDITORIAL_EASE, LIQUID_EASE, LIQUID_MORPH, LIQUID_SPRING, LIQUID_TAP } from '../lib/motion';
 
 interface DemoConversation {
   q: string;
@@ -268,12 +268,12 @@ export function HeroChatShowcase({
 
   return (
     <motion.div
-      initial={prefersReducedMotion ? false : { opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.48, delay: 0.18, ease: LIQUID_EASE }}
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 26, scale: 0.975 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.62, delay: 0.2, ease: EDITORIAL_EASE }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="mt-12 sm:mt-16 max-w-2xl mx-auto text-left rounded-[26px] bg-[var(--card)]/92 backdrop-blur-2xl border border-[var(--bd)]/90 shadow-[0_30px_75px_-28px_rgba(24,23,21,0.26)] dark:shadow-[0_34px_85px_-28px_rgba(0,0,0,0.72)] overflow-hidden"
+      className="mt-12 sm:mt-16 max-w-2xl mx-auto text-left rounded-[26px] bg-[var(--card)]/92 backdrop-blur-2xl border border-[var(--bd)]/90 shadow-[0_30px_75px_-28px_rgba(24,23,21,0.26)] dark:shadow-[0_34px_85px_-28px_rgba(0,0,0,0.72)] overflow-hidden will-change-transform"
     >
       {/* Top Window Chrome: Brand Identity + Interactive Scenario Switcher */}
       <div className="px-4 sm:px-5 py-3 border-b border-[var(--bd)]/75 bg-[var(--bg)]/45 flex items-center justify-between gap-2.5">
@@ -321,17 +321,17 @@ export function HeroChatShowcase({
       {/* Main Conversation Stage */}
       <div className="px-4 sm:px-6 pt-5 pb-4 min-h-[214px] sm:min-h-[224px] flex flex-col justify-between gap-4">
         <div className="space-y-4">
-          {/* User Sent Message Bubble */}
+          {/* User Sent Message Bubble — launches smoothly upward from composer */}
           <div className="min-h-[42px] flex justify-end items-start">
             <AnimatePresence mode="wait">
               {sentQuestion && (
                 <motion.div
                   key={`${lang}-q-${currentIdx}`}
-                  initial={prefersReducedMotion ? false : { opacity: 0, y: 10, scale: 0.985 }}
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: 24, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={prefersReducedMotion ? undefined : { opacity: 0, y: -6 }}
-                  transition={{ duration: 0.24, ease: LIQUID_EASE }}
-                  className="inline-block max-w-[88%] px-4 py-2.5 rounded-2xl rounded-br-sm bg-[var(--surf)] border border-[var(--bd)]/75 text-[14px] sm:text-[14.5px] font-medium text-[var(--tx)] leading-snug"
+                  exit={prefersReducedMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
+                  transition={LIQUID_SPRING}
+                  className="inline-block max-w-[88%] px-4 py-2.5 rounded-2xl rounded-br-sm bg-[var(--surf)] border border-[var(--bd)]/75 text-[14px] sm:text-[14.5px] font-medium text-[var(--tx)] leading-snug origin-bottom-right"
                 >
                   {renderPromptText(sentQuestion)}
                 </motion.div>
@@ -344,30 +344,43 @@ export function HeroChatShowcase({
             {stage !== 'composing' && (
               <motion.div
                 key={`${lang}-a-${currentIdx}`}
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={prefersReducedMotion ? undefined : { opacity: 0, y: -4 }}
-                transition={{ duration: 0.24, ease: LIQUID_EASE }}
+                exit={prefersReducedMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={{ duration: 0.28, ease: EDITORIAL_EASE }}
                 className="flex items-start gap-3"
               >
-                <div className="w-7 h-7 rounded-full bg-[var(--surf)] border border-[var(--bd)] flex items-center justify-center shrink-0 mt-0.5">
+                <motion.div
+                  animate={
+                    !prefersReducedMotion && stage === 'thinking'
+                      ? { rotate: [0, 180, 360] }
+                      : { rotate: 0 }
+                  }
+                  transition={
+                    stage === 'thinking'
+                      ? { duration: 1.6, repeat: Infinity, ease: 'linear' }
+                      : { duration: 0.3, ease: LIQUID_EASE }
+                  }
+                  className="w-7 h-7 rounded-full bg-[var(--surf)] border border-[var(--bd)] flex items-center justify-center shrink-0 mt-0.5"
+                >
                   <LongclawLogo className="w-[17px] h-[17px] text-[var(--tx)]" />
-                </div>
+                </motion.div>
 
                 <div className="flex-1 min-w-0">
                   {stage === 'thinking' ? (
-                    <div className="inline-flex items-center gap-2.5 py-1 text-xs sm:text-[13px] text-[var(--mut)]">
+                    <div className="inline-flex items-center gap-3 py-1 text-xs sm:text-[13px] text-[var(--mut)]">
                       <span>{activeMeta.thinking}</span>
-                      <span className="inline-flex items-center gap-1" aria-hidden="true">
-                        {[0, 1, 2].map((dot) => (
+                      {/* Crisp rhythmic hairline wave equalizer (zero blur) */}
+                      <span className="inline-flex items-center gap-[3px] h-3" aria-hidden="true">
+                        {[0, 1, 2, 3].map((bar) => (
                           <motion.span
-                            key={dot}
-                            className="w-1 h-1 rounded-full bg-[var(--tx)]"
-                            animate={{ opacity: [0.22, 0.85, 0.22] }}
+                            key={bar}
+                            className="w-[2px] h-full rounded-full bg-[var(--ac)] origin-center"
+                            animate={{ scaleY: [0.3, 1, 0.3], opacity: [0.35, 0.95, 0.35] }}
                             transition={{
                               repeat: Infinity,
-                              duration: 1.05,
-                              delay: dot * 0.16,
+                              duration: 0.85,
+                              delay: bar * 0.12,
                               ease: 'easeInOut',
                             }}
                           />
@@ -391,24 +404,31 @@ export function HeroChatShowcase({
                         {stage === 'done' && (
                           <motion.div
                             key={`artifact-${currentIdx}`}
-                            initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            initial={prefersReducedMotion ? false : { opacity: 0, y: 10, scale: 0.985 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={prefersReducedMotion ? undefined : { opacity: 0, y: 4 }}
-                            transition={{ duration: 0.28, ease: LIQUID_EASE }}
+                            transition={{ duration: 0.34, ease: EDITORIAL_EASE }}
                           >
                             {currentIdx === 0 && (
                               <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11.5px] text-[var(--mut)]">
                                 {(lang === 'tr'
                                   ? ['Perşembe 14:00', 'Bütçe onaylı', 'Metin onayı bekleniyor']
                                   : ['Thu 14:00 review', 'Budget approved', 'Copy sign-off']
-                                ).map((item) => (
-                                  <span
+                                ).map((item, idx) => (
+                                  <motion.span
                                     key={item}
+                                    initial={prefersReducedMotion ? false : { opacity: 0, y: 6, scale: 0.96 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    transition={{
+                                      duration: 0.28,
+                                      delay: idx * 0.07,
+                                      ease: EDITORIAL_EASE,
+                                    }}
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--surf)]/85 border border-[var(--bd)]/80 text-[var(--tx)]/82"
                                   >
                                     <Check className="w-3 h-3 text-emerald-500 shrink-0" />
                                     <span>{item}</span>
-                                  </span>
+                                  </motion.span>
                                 ))}
                               </div>
                             )}
@@ -432,8 +452,19 @@ export function HeroChatShowcase({
                                     </p>
                                   </div>
                                 </div>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium shrink-0">
-                                  <Check className="w-3 h-3" />
+                                <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium shrink-0">
+                                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                                    <motion.path
+                                      d="M2.5 7.4L5.6 10.4L11.5 3.8"
+                                      stroke="currentColor"
+                                      strokeWidth="1.9"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      initial={prefersReducedMotion ? { pathLength: 1 } : { pathLength: 0 }}
+                                      animate={{ pathLength: 1 }}
+                                      transition={{ duration: 0.36, delay: 0.1, ease: LIQUID_EASE }}
+                                    />
+                                  </svg>
                                   <span>{lang === 'tr' ? 'Eklendi' : 'Saved'}</span>
                                 </span>
                               </div>

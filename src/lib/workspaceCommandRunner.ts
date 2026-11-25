@@ -1,5 +1,10 @@
 import { Language } from './i18n';
-import { apiUrl, getStaticHostNotice, isStaticHostWithoutBackend } from './api';
+import {
+  apiUrl,
+  getStaticHostNotice,
+  isStaticHostErrorResponse,
+  isStaticHostWithoutBackend,
+} from './api';
 import {
   buildGmailSearchQueryFromPrompt,
   createGmailDraft,
@@ -191,7 +196,7 @@ export async function runWorkspaceSlashCommand(params: {
     }),
   });
 
-  if (planRes.status === 404 && !import.meta.env.VITE_API_BASE_URL) {
+  if (isStaticHostErrorResponse(planRes)) {
     throw new Error(getStaticHostNotice(lang));
   }
 
